@@ -30,11 +30,20 @@ export const useAuth = () => {
     user.value = null
   }
 
+  // the login response is the profile, so the session starts without a second request
+  const signIn = async (email, password) => {
+    user.value = await api.login(email, password)
+    ready.value = true
+    inFlight = Promise.resolve()
+    return user.value
+  }
+
   return {
     user,
     ready,
     isLoggedIn: computed(() => Boolean(user.value)),
     load,
+    signIn,
     logout
   }
 }
