@@ -198,24 +198,32 @@ npm start                         # serves the api and the built ui on :4000
 
 ## API
 
+The JSON API lives under `/api`, which keeps it clear of the Vue router — the app
+owns `/recipe/:id` as a page, the API owns `/api/recipes/:id` as data. Three paths
+stay outside `/api` on purpose: `/auth/google*` is registered in the Google console,
+`/verify-email` is already sitting in people's inboxes, and `/data/recipes_pics/…`
+is stored in the `photo` column of existing rows.
+
 | Method | Route | Auth | |
 | --- | --- | --- | --- |
-| POST | `/signup` | – | Body `{ email, password }`. Sends the confirmation link. |
-| POST | `/login` | – | Body `{ email, password }`. `403` + `code: "unverified"` if unconfirmed. |
+| POST | `/api/signup` | – | Body `{ email, password }`. Sends the confirmation link. |
+| POST | `/api/login` | – | Body `{ email, password }`. `403` + `code: "unverified"` if unconfirmed. |
 | GET | `/verify-email?token=` | – | Opened from the email, redirects to `/signin?verify=…`. |
-| POST | `/resend-verification` | – | Body `{ email }`. |
+| POST | `/api/resend-verification` | – | Body `{ email }`. |
 | GET | `/auth/google` | – | Starts sign-in. Takes `?next=/path` to return to. |
 | GET | `/auth/google/callback` | – | Google redirects here. |
-| GET | `/getProfileInfo` | ✔ | Current user. |
-| POST | `/logout` | – | Destroys the session. |
-| GET | `/recipes` | – | All recipes, most liked first. |
-| GET | `/recipe/:id` | – | One recipe. |
-| DELETE | `/recipe/:id` | ✔ | Author only. Removes the photo and cascades likes and comments. |
-| GET | `/myRecipes` | ✔ | Recipes you posted. |
-| POST | `/createRecipe` | ✔ | Multipart: `name`, `info`, `image`, and `recipe` / `ingredients` as JSON arrays. |
-| POST | `/like/:recipe_id` | ✔ | Body `{ "like": 1 }` or `{ "like": 0 }`. |
-| GET | `/recipe/:id/comments` | – | Newest first, with author name and picture. |
-| POST | `/recipe/:id/comments` | ✔ | Body `{ body }`, up to 1000 characters. |
-| DELETE | `/comments/:comment_id` | ✔ | The comment's author or the recipe's author. |
+| GET | `/api/profile` | ✔ | Current user. |
+| POST | `/api/logout` | – | Destroys the session. |
+| GET | `/api/recipes` | – | All recipes, most liked first. |
+| POST | `/api/recipes` | ✔ | Multipart: `name`, `info`, `image`, and `recipe` / `ingredients` as JSON arrays. |
+| GET | `/api/recipes/mine` | ✔ | Recipes you posted. |
+| GET | `/api/recipes/:id` | – | One recipe. |
+| DELETE | `/api/recipes/:id` | ✔ | Author only. Removes the photo and cascades likes and comments. |
+| POST | `/api/recipes/:id/like` | ✔ | Body `{ "like": 1 }` or `{ "like": 0 }`. |
+| GET | `/api/recipes/:id/comments` | – | Newest first, with author name and picture. |
+| POST | `/api/recipes/:id/comments` | ✔ | Body `{ body }`, up to 1000 characters. |
+| DELETE | `/api/comments/:comment_id` | ✔ | The comment's author or the recipe's author. |
+| GET | `/data/recipes_pics/:file` | – | Uploaded photos. |
 
-Protected routes answer `401` with `{ "message": "you are not signed in" }`.
+Protected routes answer `401` with `{ "message": "you are not signed in" }`, and an
+unknown `/api` path answers `404` JSON rather than the HTML shell.
