@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const {dbFind, dbRecipes, dbMyRecipes, insertRecipe, handlelike, getMostLiked} = require('../db');
-const { isLoggedIn } = require('../local_strategy');
+const { isLoggedIn } = require('../google_strategy');
 const {upload}  = require('../file_uploud')
 const uuid = require('uuid').v4
 const path = require('path')
