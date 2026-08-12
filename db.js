@@ -144,7 +144,9 @@ function handlelike(recipe_id, user_id, likeStatement){
         }else if(likeStatement == 0){
             rankComlumn = ['dislikes', 'likes']
         }else{
-            reject(new Error("user tried to put dum thing into request."))
+            //without the return this carried on and ran the queries below with an
+            //undefined column name, which left the request hanging
+            return reject(new Error("like must be 1 or 0"))
         }
 
         const findRecordQuery = `SELECT * FROM likes 
@@ -198,26 +200,24 @@ function handlelike(recipe_id, user_id, likeStatement){
 }
 
 async function getRecipes(data){
-    console.log(data)
-    let recipes = []
-    return new Promise(async(resolve, reject) => {
-        //without this the promise never settles on an empty table and the request hangs
-        if(data.length == 0){
-            return resolve(recipes)
+    const recipes = []
+
+    for(const rank of data){
+        const recipe = await dbFind("recipes","recipe_id",rank.recipe_id)
+
+        //a ranking row can outlive its recipe when something deleted the recipe on a
+        //connection without foreign keys on. skip it instead of dying on the whole list.
+        if(!recipe){
+            console.log(`ranking row ${rank.recipe_id} has no recipe, skipping`)
+            continue
         }
-        for(const rank of data){
-            const recipe = await dbFind("recipes","recipe_id",rank.recipe_id)
-              let recipeWithLike = recipe
-              recipeWithLike.likes = rank.likes
-              recipeWithLike.dislikes = rank.dislikes
-              recipes.push(recipeWithLike)
-              //console.log('afterPush: '+recipeWithLike.likes)
-              if(recipes.length==data.length){
-                resolve(recipes)
-              }
-          };
-        
-    })
+
+        recipe.likes = rank.likes
+        recipe.dislikes = rank.dislikes
+        recipes.push(recipe)
+    }
+
+    return recipes
 }
 
 const mostLikedQuerry = `SELECT * FROM ranking ORDER BY likes DESC;`
@@ -227,10 +227,7 @@ function getMostLiked(){
             if(err){
                 reject(new Error(err))
             }else{
-                getRecipes(data).then(recipes=>{
-                    resolve(recipes)
-                })
-                
+                getRecipes(data).then(resolve).catch(err=>reject(new Error(err)))
             }
         })
     })
@@ -417,34 +414,28 @@ function dbRecipes(){
 }
 
 async function addLikesToMyRecipes(data){
-    let finalResult = []
-    return new Promise(async(resolve, reject) => {
-        //without this the promise never settles on an empty table and the request hangs
-        if(data.length == 0){
-            return resolve(finalResult)
-        }
-        data.forEach(async(recipe)=>{
-            const rating = await dbFind('ranking','recipe_id',recipe.recipe_id)
-            recipe.likes = rating.likes
-            recipe.dislikes = rating.dislikes
-            finalResult.push(recipe)
-            if(data.length==finalResult.length){
-                resolve(finalResult)
-              }
-        })
-    })
+    const finalResult = []
+
+    //sequential rather than forEach(async ...), which used to resolve on whichever
+    //lookups happened to finish first and left the order up to chance
+    for(const recipe of data){
+        const rating = await dbFind('ranking','recipe_id',recipe.recipe_id)
+        //a recipe with no ranking row just has no votes yet
+        recipe.likes = rating?.likes ?? 0
+        recipe.dislikes = rating?.dislikes ?? 0
+        finalResult.push(recipe)
+    }
+
+    return finalResult
 }
 
 function dbMyRecipes(user_id){
     return new Promise((resolve, reject) => {
-        console.log("starting function")
         dbFind('recipes', 'user_id', user_id, false, false, 'all').then((data, err)=>{
             if(err){
                 reject(new Error(err))
             }else{
-                addLikesToMyRecipes(data).then(finalData=>{
-                    resolve(finalData)
-                })  
+                addLikesToMyRecipes(data).then(resolve).catch(err=>reject(new Error(err)))
             }
         })
     })
