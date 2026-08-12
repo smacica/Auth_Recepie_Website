@@ -51,6 +51,32 @@ app.get('*', function(req, res) {
   res.sendFile(path.join(clientDir, 'index.html'));
 });
 
-app.listen(process.env.PORT || 4000, () => {
-    console.log('Listening on localhost:4000')
+//registered last so it catches whatever the routes above threw, rather than the
+//request hanging or falling through to the html shell
+app.use(function(err, req, res, next) {
+  console.error('unhandled error on', req.method, req.originalUrl, '-', err && err.message);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ message: 'something went wrong' });
+});
+
+//a rejected promise nobody caught used to take the whole server down with it, which
+//turned one bad database row into a total outage. log it and keep serving.
+process.on('unhandledRejection', (reason) => {
+  console.error('unhandled promise rejection:', reason);
+});
+
+const port = process.env.PORT || 4000
+app.listen(port, () => {
+    console.log(`Listening on http://localhost:${port}`)
+
+    //CLIENT_URL decides where sign in drops the browser afterwards. Pointing it at
+    //the vite port and then browsing the built app on this port sends people to a
+    //dead address once google hands them back, so say plainly where they will land.
+    if(clientUrl){
+      console.log(`After sign in the browser goes to ${clientUrl} - keep that dev server running`)
+    }else{
+      console.log('After sign in the browser stays on this server')
+    }
   })
