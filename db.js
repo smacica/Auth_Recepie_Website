@@ -45,7 +45,15 @@ CREATE TABLE IF NOT EXISTS likes (
     recipe_id INTEGER REFERENCES recipes(recipe_id) ON DELETE CASCADE,
     user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
     rating INTEGER
-);`
+);
+CREATE TABLE IF NOT EXISTS comments (
+    comment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id INTEGER NOT NULL REFERENCES recipes(recipe_id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comments_recipe ON comments(recipe_id);`
 
 //sqlite cannot add a UNIQUE column with ALTER TABLE, so google_id is kept unique
 //through an index instead - that also lets several rows stay NULL
@@ -266,6 +274,72 @@ function dbDeleteRecipe(recipe_id, user_id){
                 }
             })
         }).catch(err=>reject(new Error(err)))
+    })
+}
+
+/* ---------- comments ---------- */
+
+//joined so the list carries the author's name and picture in one round trip
+const commentsQuerry = `SELECT c.comment_id, c.recipe_id, c.user_id, c.body, c.created_at,
+u.username, u.profile_pic
+FROM comments c JOIN users u ON u.user_id = c.user_id
+WHERE c.recipe_id = ?
+ORDER BY c.created_at DESC;`
+function dbComments(recipe_id){
+    return new Promise((resolve, reject) => {
+        db.all(commentsQuerry,[recipe_id],(err, rows)=>{
+            if(err){
+                reject(new Error(err))
+            }else{
+                resolve(rows)
+            }
+        })
+    })
+}
+
+function dbAddComment(recipe_id, user_id, body){
+    return new Promise((resolve, reject) => {
+        const created_at = Date.now()
+        db.run(`INSERT INTO comments(recipe_id, user_id, body, created_at) VALUES(?,?,?,?);`,
+        [recipe_id, user_id, body, created_at], function(err){
+            if(err){
+                return reject(new Error(err))
+            }
+            db.all(commentsQuerry.replace('WHERE c.recipe_id = ?','WHERE c.comment_id = ?'),[this.lastID],(err, rows)=>{
+                if(err){
+                    reject(new Error(err))
+                }else{
+                    resolve(rows[0])
+                }
+            })
+        })
+    })
+}
+
+//a comment can be removed by whoever wrote it or by the owner of the recipe
+function dbDeleteComment(comment_id, user_id){
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT c.comment_id, c.user_id, r.user_id AS recipe_owner
+        FROM comments c JOIN recipes r ON r.recipe_id = c.recipe_id
+        WHERE c.comment_id = ? LIMIT 1;`,[comment_id],(err, rows)=>{
+            if(err){
+                return reject(new Error(err))
+            }
+            const row = rows[0]
+            if(!row){
+                return resolve({ deleted: false, reason: 'missing' })
+            }
+            if(row.user_id !== user_id && row.recipe_owner !== user_id){
+                return resolve({ deleted: false, reason: 'forbidden' })
+            }
+            db.run(`DELETE FROM comments WHERE comment_id = ?;`,[comment_id],(err)=>{
+                if(err){
+                    reject(new Error(err))
+                }else{
+                    resolve({ deleted: true })
+                }
+            })
+        })
     })
 }
 
@@ -545,4 +619,4 @@ function dbDel(table,column, value, column2=false, value2=false){
     })
 }
 
-module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, dbDeleteRecipe, addLike, getMostLiked, handlelike }
+module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, dbDeleteRecipe, dbComments, dbAddComment, dbDeleteComment, addLike, getMostLiked, handlelike }
