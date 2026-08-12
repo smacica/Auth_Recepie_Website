@@ -42,15 +42,13 @@ function(req, res) {
     }
 }
 );
-router.get('/getProfileInfo', function(req,res){
-if(req.user){
+router.get('/getProfileInfo', isLoggedIn, function(req,res){
     addLikesToUser(req.user).then(user_object=>{
         res.json(user_object)
+    }).catch(err=>{
+        console.log(err)
+        res.status(500).json({message: "could not load the profile"})
     })
-}else{
-    res.send("u are not auth")
-}
-res.end
 })
 
 module.exports = router

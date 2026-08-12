@@ -33,11 +33,14 @@ const strategy = new LocalStrategy(
     }  
   )
 
-  function isLoggedIn(request, response, done) {   if (request.user) {
+//the vue app calls these as an api, so answer with a status it can act on
+//instead of redirecting into the html shell
+function isLoggedIn(request, response, done) {
+  if (request.user) {
     return done();
   }
-  return response.redirect("/")
-  }
+  return response.status(401).json({ message: "you are not signed in" })
+}
 
 function passportMiddle(req, res, next){
     passport.authenticate("local",
