@@ -130,15 +130,27 @@ router.get('/auth/google', function(req, res, next){
     passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next)
 });
 
-//step 2 - google sends the browser back here with a code
-router.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: `${clientUrl}/signin?error=auth` }),
-    function(req, res) {
-        const returnTo = safeNext(req.session.returnTo)
-        delete req.session.returnTo
-        res.redirect(clientUrl + returnTo)
-    }
-);
+//step 2 - google sends the browser back here with a code.
+//this is a browser navigation, so every outcome has to end in a redirect. the plain
+//failureRedirect option only covers a refused sign in, not an error thrown while
+//exchanging the code, which used to surface as a raw 500 page.
+router.get('/auth/google/callback', function(req, res, next){
+    passport.authenticate('google', function(err, user){
+        if(err || !user){
+            console.log('google sign in failed:', err ? err.message : 'no user returned')
+            return res.redirect(`${clientUrl}/signin?error=auth`)
+        }
+        req.login(user, function(err){
+            if(err){
+                console.log('google sign in failed at login:', err.message)
+                return res.redirect(`${clientUrl}/signin?error=auth`)
+            }
+            const returnTo = safeNext(req.session.returnTo)
+            delete req.session.returnTo
+            res.redirect(clientUrl + returnTo)
+        })
+    })(req, res, next)
+});
 
 /* ---------- session ---------- */
 
