@@ -11,9 +11,9 @@ const dbPath = path.join(dataDir, 'main.db')
 const schemaQuerry = `
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    google_id TEXT,
     username TEXT NOT NULL UNIQUE,
     email TEXT,
-    password TEXT NOT NULL,
     profile_pic TEXT,
     bio TEXT
 );
@@ -40,6 +40,41 @@ CREATE TABLE IF NOT EXISTS likes (
     rating INTEGER
 );`
 
+//sqlite cannot add a UNIQUE column with ALTER TABLE, so google_id is kept unique
+//through an index instead - that also lets several rows stay NULL
+const indexQuerry = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);`
+
+//brings a database created before google sign in up to the current shape
+function migrateUsers(){
+    return new Promise((resolve, reject) => {
+        db.all(`PRAGMA table_info(users);`,(err, columns)=>{
+            if(err){
+                return reject(new Error(err))
+            }
+            const names = columns.map(column => column.name)
+            const steps = []
+            if(!names.includes('google_id')){
+                steps.push(`ALTER TABLE users ADD COLUMN google_id TEXT;`)
+            }
+            //passwords are gone, everyone signs in through google now
+            if(names.includes('password')){
+                steps.push(`ALTER TABLE users DROP COLUMN password;`)
+            }
+            if(!steps.length){
+                return resolve()
+            }
+            db.exec(steps.join('\n'),(err)=>{
+                if(err){
+                    reject(new Error(err))
+                }else{
+                    console.log('users table migrated to google sign in')
+                    resolve()
+                }
+            })
+        })
+    })
+}
+
 let db = new sqlite3.Database(dbPath, (err) => {
 
     if(err)
@@ -54,8 +89,15 @@ let db = new sqlite3.Database(dbPath, (err) => {
         })
         db.exec(schemaQuerry,(err)=>{
             if(err){
-                console.log(err)
+                return console.log(err)
             }
+            migrateUsers().then(()=>{
+                db.exec(indexQuerry,(err)=>{
+                    if(err){
+                        console.log(err)
+                    }
+                })
+            }).catch(err=>console.log(err))
         })
     }
 })
@@ -247,19 +289,62 @@ function dbMyRecipes(user_id){
     })
 }
 
-const userCreateQuery = `INSERT INTO users(username, email, password, profile_pic, bio) VALUES(?,?,?,?,?)
+const userCreateQuery = `INSERT INTO users(google_id, username, email, profile_pic, bio) VALUES(?,?,?,?,?)
 `
 function dbCreateUser(data){
     return new Promise((resolve, reject) => {
-        const values = [data.username, data.email, data.password, data.prof_pic, data.bio]
-        db.run(userCreateQuery ,values, (err , data) => {
+        const values = [data.google_id, data.username, data.email, data.profile_pic, data.bio]
+        db.run(userCreateQuery ,values, function(err){
             if(err){
-                reject(new Error(err))      
+                reject(new Error(err))
             }else{
-                resolve()
+                resolve(this.lastID)
             }
             });
     })
+}
+
+//usernames are unique, so a second "Anna" becomes "Anna2", then "Anna3", ...
+async function uniqueUsername(preferred){
+    const base = (preferred || 'cook').trim().slice(0, 40) || 'cook'
+    let candidate = base
+    let suffix = 1
+    while(await dbFind('users','username',candidate)){
+        suffix += 1
+        candidate = `${base}${suffix}`
+    }
+    return candidate
+}
+
+//one entry point for google sign in: match on google_id, fall back to the email
+//of an older password account, otherwise create the user
+async function dbFindOrCreateGoogleUser(profile){
+    const byGoogleId = await dbFind('users','google_id',profile.google_id)
+    if(byGoogleId){
+        return byGoogleId
+    }
+
+    if(profile.email){
+        const byEmail = await dbFind('users','email',profile.email)
+        if(byEmail){
+            //link the existing account to google instead of making a duplicate
+            await dbUpdate('users','user_id',byEmail.user_id,'google_id',profile.google_id)
+            if(profile.profile_pic){
+                await dbUpdate('users','user_id',byEmail.user_id,'profile_pic',profile.profile_pic)
+            }
+            return dbFind('users','user_id',byEmail.user_id)
+        }
+    }
+
+    const username = await uniqueUsername(profile.username || (profile.email || '').split('@')[0])
+    const user_id = await dbCreateUser({
+        google_id: profile.google_id,
+        username,
+        email: profile.email,
+        profile_pic: profile.profile_pic,
+        bio: 'Just joined EatHub.'
+    })
+    return dbFind('users','user_id',user_id)
 }
 
 function dbFind(table,column, value, column2=false, value2=false, limit = 1){
@@ -330,4 +415,4 @@ function dbDel(table,column, value, column2=false, value2=false){
     })
 }
 
-module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbCreateUser,insertRecipe, dbMyRecipes, addLike, getMostLiked, handlelike }
+module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbCreateUser, dbFindOrCreateGoogleUser, insertRecipe, dbMyRecipes, addLike, getMostLiked, handlelike }
