@@ -1,11 +1,57 @@
 # EatHub
 
-Recipe sharing site. Express + SQLite API, Vue 3 frontend, Google sign-in.
+Recipe sharing site. Express + SQLite API, Vue 3 frontend. Sign in with Google or
+with an email address confirmed by a verification link.
 
 ```
 .                     express api (routes/, db.js, google_strategy.js)
 └── frontend/         vue 3 + vite app, builds into frontend/dist
 ```
+
+---
+
+## Sending the verification emails
+
+Email signup needs somewhere to send the confirmation link.
+
+**In development you can skip this entirely.** With `SMTP_HOST` empty, the link is
+printed to the server console instead of being sent:
+
+```
+--- verification link for cook@example.com ---
+http://localhost:4000/verify-email?token=3a587e65…
+---
+```
+
+Paste that into the browser and the account is confirmed.
+
+**For real delivery**, fill in the SMTP block in `.env` with any provider:
+
+```dotenv
+SMTP_HOST=smtp.sendgrid.net      # or smtp.gmail.com, smtp.mailgun.org, …
+SMTP_PORT=587                    # 465 if the provider wants implicit TLS
+SMTP_USER=apikey
+SMTP_PASS=your-smtp-password
+MAIL_FROM=EatHub <no-reply@yourdomain.com>
+PUBLIC_URL=https://eathub.example.com
+```
+
+Set `PUBLIC_URL` in production. The link inside the email has to be absolute, and
+deriving it from the request headers gets it wrong when you sit behind a proxy.
+
+> With Gmail, `SMTP_PASS` must be an [App Password](https://myaccount.google.com/apppasswords),
+> not your account password.
+
+How the flow behaves:
+
+- Signing up creates the account but leaves it unusable until the link is opened.
+- Logging in before confirming answers `403` with `code: "unverified"`, and the
+  sign-in page then offers to resend the link.
+- Links last 24 hours and work once. Asking for a new one invalidates the old.
+- Signing up with an address that already exists returns the same message as a new
+  signup and quietly sends nothing, so the endpoint cannot be used to discover who
+  has an account.
+- Google accounts skip all of this — Google has already verified the address.
 
 ---
 
@@ -136,27 +182,40 @@ npm start                         # serves the api and the built ui on :4000
 
 ## Auth notes
 
-- Sign-in is Google-only. There are no passwords in the database.
-- `users.google_id` identifies an account. If a Google email matches a row that
-  already existed, that row is linked to the Google account instead of a duplicate
-  being created.
-- On first start, `db.js` migrates an older database: it adds `google_id` and drops
-  the `password` column. Old accounts keep their recipes and sign in with Google
-  using the same email address.
+- Two ways in: Google, or an email address plus a password of at least 8 characters
+  confirmed by a verification link. Passwords are stored as bcrypt hashes.
+- `users.google_id` identifies a Google account. If a Google email matches a row
+  that already existed, that row is linked instead of a duplicate being created,
+  and it counts as verified from then on.
+- Wrong password and unknown address give the same `401` and the same wording, so
+  the login route cannot be used to enumerate accounts.
+- On first start, `db.js` migrates an older database: it adds `google_id`,
+  `email_verified` and a nullable `password`, creates the `email_tokens` and
+  `comments` tables, and marks existing Google accounts verified. Password hashes
+  from the original schema are not carried over — those accounts sign in with
+  Google, or sign up again with the same address.
 - Sessions live in the same SQLite file; the cookie lasts a week.
 
 ## API
 
 | Method | Route | Auth | |
 | --- | --- | --- | --- |
+| POST | `/signup` | – | Body `{ email, password }`. Sends the confirmation link. |
+| POST | `/login` | – | Body `{ email, password }`. `403` + `code: "unverified"` if unconfirmed. |
+| GET | `/verify-email?token=` | – | Opened from the email, redirects to `/signin?verify=…`. |
+| POST | `/resend-verification` | – | Body `{ email }`. |
 | GET | `/auth/google` | – | Starts sign-in. Takes `?next=/path` to return to. |
 | GET | `/auth/google/callback` | – | Google redirects here. |
 | GET | `/getProfileInfo` | ✔ | Current user. |
 | POST | `/logout` | – | Destroys the session. |
 | GET | `/recipes` | – | All recipes, most liked first. |
 | GET | `/recipe/:id` | – | One recipe. |
+| DELETE | `/recipe/:id` | ✔ | Author only. Removes the photo and cascades likes and comments. |
 | GET | `/myRecipes` | ✔ | Recipes you posted. |
 | POST | `/createRecipe` | ✔ | Multipart: `name`, `info`, `image`, and `recipe` / `ingredients` as JSON arrays. |
 | POST | `/like/:recipe_id` | ✔ | Body `{ "like": 1 }` or `{ "like": 0 }`. |
+| GET | `/recipe/:id/comments` | – | Newest first, with author name and picture. |
+| POST | `/recipe/:id/comments` | ✔ | Body `{ body }`, up to 1000 characters. |
+| DELETE | `/comments/:comment_id` | ✔ | The comment's author or the recipe's author. |
 
 Protected routes answer `401` with `{ "message": "you are not signed in" }`.
