@@ -11,11 +11,15 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      //one copy of the ingredient rules, shared with the express side
+      '@shared': fileURLToPath(new URL('../shared', import.meta.url))
     }
   },
   server: {
     port: 5173,
+    //the shared folder sits above this project root
+    fs: { allow: ['..'] },
     proxy: Object.fromEntries(
       apiRoutes.map(route => [route, { target: 'http://localhost:4000', changeOrigin: true }])
     )
