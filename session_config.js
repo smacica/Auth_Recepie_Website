@@ -1,21 +1,31 @@
 const uuid = require('uuid').v4
-const {db} = require('./db')
 var session = require('express-session');
 const Store = require('express-sqlite3')(session);
 
 const storeOptions = {
-  db: './data/main.db', // Use SQLite3 in memory db.
+  db: './data/main.db',
   concurentDb: true, // Enable SQLite3 WAL.
 };
 
-// new MySQLStore({}, connection);
+if (!process.env.SESSION_SECRET) {
+  console.warn('SESSION_SECRET is missing, falling back to a development value. See README.md')
+}
+
 sessionConf = {
     genid: (req) => {
       return uuid() // use UUIDs for session IDs
-    }, 
-    saveUninitialized: true,
-    secret: "your secret line of secretness",
+    },
+    resave: false,
+    //no session row until something is actually stored on it
+    saveUninitialized: false,
+    secret: process.env.SESSION_SECRET || "dev-only-secret",
     store: new Store(storeOptions),
-    cookie: { maxAge: 60*60000 }, // value of maxAge is defined in milliseconds. 
+    cookie: {
+      httpOnly: true,
+      //the oauth callback is a top level redirect, lax still sends the cookie
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // a week
+    },
   }
 module.exports = {sessionConf}
