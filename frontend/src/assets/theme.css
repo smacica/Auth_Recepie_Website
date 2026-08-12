@@ -1,0 +1,265 @@
+/* EatHub cooking theme - warm kitchen palette, paper-ish surfaces */
+
+:root {
+  --paprika: #d2551e;
+  --paprika-dark: #a83f13;
+  --saffron: #e8a33d;
+  --basil: #4f7a3a;
+  --chili: #c02e2e;
+
+  --crust: #2b1d14;
+  --crust-soft: #6b5647;
+  --cream: #fdf6ec;
+  --cream-deep: #f6e8d6;
+  --parchment: #fffdfa;
+  --line: #e8d9c5;
+
+  --shadow-sm: 0 1px 2px rgba(43, 29, 20, 0.06);
+  --shadow-md: 0 6px 18px rgba(43, 29, 20, 0.09);
+  --shadow-lg: 0 18px 40px rgba(43, 29, 20, 0.14);
+
+  --radius: 14px;
+  --radius-lg: 22px;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --page: 1120px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--cream);
+  /* faint speckle so the page reads like parchment instead of flat white */
+  background-image: radial-gradient(circle at 1px 1px, rgba(43, 29, 20, 0.045) 1px, transparent 0);
+  background-size: 22px 22px;
+  color: var(--crust);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 0.4em;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3.1rem);
+}
+h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+h3 {
+  font-size: 1.2rem;
+}
+
+a {
+  color: var(--paprika-dark);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+.page {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paprika);
+  margin-bottom: 10px;
+}
+
+.muted {
+  color: var(--crust-soft);
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--paprika);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: var(--paprika-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--crust);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.btn--ghost:hover {
+  background: var(--cream-deep);
+  color: var(--crust);
+}
+
+.btn--sm {
+  padding: 7px 14px;
+  font-size: 0.88rem;
+}
+
+/* ---------- surfaces ---------- */
+
+.card {
+  background: var(--parchment);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel {
+  background: var(--parchment);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 28px;
+}
+
+/* ---------- forms ---------- */
+
+label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+
+input[type="text"],
+input[type="file"],
+textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--cream);
+  font: inherit;
+  color: var(--crust);
+}
+
+input[type="text"]:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--saffron);
+  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.25);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+/* ---------- feedback ---------- */
+
+.notice {
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--cream-deep);
+  font-size: 0.94rem;
+}
+
+.notice--error {
+  border-color: rgba(192, 46, 46, 0.35);
+  background: rgba(192, 46, 46, 0.08);
+  color: #8c1f1f;
+}
+
+.notice--ok {
+  border-color: rgba(79, 122, 58, 0.35);
+  background: rgba(79, 122, 58, 0.1);
+  color: #33562a;
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--crust-soft);
+}
+
+.empty__icon {
+  font-size: 2.6rem;
+  margin-bottom: 8px;
+}
+
+/* ---------- grid ---------- */
+
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 26px;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 20px;
+  }
+}
