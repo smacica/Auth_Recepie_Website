@@ -8,8 +8,27 @@ const path = require('path')
 const fs = require('fs')
 const date = require('../aditional_functions/get_current_date')
 const { normaliseIngredients } = require('../shared/ingredients.mjs')
+const { generateRecipe, isConfigured: geminiConfigured } = require('../gemini')
+const aiQuota = require('../ai_quota')
 
 const picsDir = path.join(__dirname, '..', 'data', 'recipes_pics')
+
+//artwork that generated recipes get as their photo. vite copies this folder into
+//the build, so the same /ai_pics/... url works in dev and in production.
+const aiPicsDir = path.join(__dirname, '..', 'frontend', 'public', 'ai_pics')
+let aiPics = []
+try{
+  aiPics = fs.readdirSync(aiPicsDir).filter(name => /\.(jpe?g|png|webp)$/i.test(name))
+}catch(err){
+  console.log('no ai_pics folder found, generated recipes will have no photo')
+}
+
+function randomAiPic(){
+  if(!aiPics.length){
+    return null
+  }
+  return '/ai_pics/' + aiPics[Math.floor(Math.random() * aiPics.length)]
+}
 
 
 function generateRecipeId(req, res, next){
@@ -87,6 +106,77 @@ router.delete('/api/recipes/:id',isLoggedIn,(req,res)=>{
     console.log(err)
     res.status(500).json({message: "could not delete the recipe"})
   })
+})
+
+/* ---------- ai generation ---------- */
+
+const AI_INGREDIENTS_MAX = 400
+const AI_DESCRIPTION_MAX = 200
+
+//how many generations this user has left today
+router.get('/api/ai/quota', isLoggedIn, (req, res)=>{
+  aiQuota.peek(req.user.user_id).then(quota=>{
+    res.json({ ...quota, configured: geminiConfigured() })
+  }).catch(err=>{
+    console.log(err)
+    res.status(500).json({message: "could not read the quota"})
+  })
+})
+
+//maps a generation failure onto something the page can show
+const FAILURES = {
+  'not-configured': [503, "AI generation is not set up on this server."],
+  'not-food':       [422, "That does not look like a food request, so nothing was generated."],
+  'incomplete':     [422, "The model did not return a usable recipe. Try describing the dish differently."],
+  'unreadable':     [502, "The model returned something we could not read. Try again."],
+  'rate-limited':   [429, "Google's free quota is used up for now. Try again later."],
+  'timeout':        [504, "The model took too long to answer. Try again."],
+  'unreachable':    [502, "Could not reach the model. Try again."],
+  'upstream':       [502, "The model refused the request. Try again."]
+}
+
+router.post('/api/recipes/generate', isLoggedIn, generateRecipeId, async (req, res)=>{
+  const ingredients = String(req.body.ingredients || '').trim().slice(0, AI_INGREDIENTS_MAX)
+  const description = String(req.body.description || '').trim().slice(0, AI_DESCRIPTION_MAX)
+
+  if(!ingredients && !description){
+    return res.status(400).json({message: "Tell the model what you have or what you want."})
+  }
+  if(!geminiConfigured()){
+    return res.status(503).json({message: FAILURES['not-configured'][1]})
+  }
+
+  try{
+    //booked before the call so a burst of requests cannot slip past the free tier
+    const slot = await aiQuota.reserve(req.user.user_id)
+    if(!slot.ok){
+      return res.status(429).json({message: slot.message, reason: slot.reason})
+    }
+
+    const result = await generateRecipe({ ingredients, description })
+
+    if(!result.ok){
+      const [status, message] = FAILURES[result.reason] || FAILURES.upstream
+      return res.status(status).json({message, reason: result.reason})
+    }
+
+    const recipe = {
+      recipe_id: req.recipeId,
+      user_id: req.user.user_id,
+      name: result.recipe.title,
+      photo: randomAiPic(),
+      info: result.recipe.description,
+      recipe: result.recipe.steps,
+      date: date(),
+      ingredients: result.recipe.ingredients
+    }
+
+    await insertRecipe(recipe)
+    res.status(201).json({ recipe_id: recipe.recipe_id, remaining: slot.remaining })
+  }catch(err){
+    console.log(err)
+    res.status(500).json({message: "Could not save the generated recipe."})
+  }
 })
 
 const COMMENT_MAX = 1000
