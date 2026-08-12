@@ -50,23 +50,23 @@ const normaliseRecipe = recipe => ({
 })
 
 export const api = {
-  getProfile: () => request('/getProfileInfo'),
-  logout: () => request('/logout', { method: 'POST' }),
+  getProfile: () => request('/api/profile'),
+  logout: () => request('/api/logout', { method: 'POST' }),
 
-  signup: (email, password) => request('/signup', asJson({ email, password })),
-  login: (email, password) => request('/login', asJson({ email, password })),
-  resendVerification: email => request('/resend-verification', asJson({ email })),
+  signup: (email, password) => request('/api/signup', asJson({ email, password })),
+  login: (email, password) => request('/api/login', asJson({ email, password })),
+  resendVerification: email => request('/api/resend-verification', asJson({ email })),
 
-  getRecipes: async () => (await request('/recipes')).map(normaliseRecipe),
-  getMyRecipes: async () => (await request('/myRecipes')).map(normaliseRecipe),
-  getRecipe: async id => normaliseRecipe(await request(`/recipe/${id}`)),
+  getRecipes: async () => (await request('/api/recipes')).map(normaliseRecipe),
+  getMyRecipes: async () => (await request('/api/recipes/mine')).map(normaliseRecipe),
+  getRecipe: async id => normaliseRecipe(await request(`/api/recipes/${id}`)),
 
-  createRecipe: formData => request('/createRecipe', { method: 'POST', body: formData }),
-  deleteRecipe: id => request(`/recipe/${id}`, { method: 'DELETE' }),
+  createRecipe: formData => request('/api/recipes', { method: 'POST', body: formData }),
+  deleteRecipe: id => request(`/api/recipes/${id}`, { method: 'DELETE' }),
 
-  getComments: recipeId => request(`/recipe/${recipeId}/comments`),
-  addComment: (recipeId, body) => request(`/recipe/${recipeId}/comments`, asJson({ body })),
-  deleteComment: commentId => request(`/comments/${commentId}`, { method: 'DELETE' }),
+  getComments: recipeId => request(`/api/recipes/${recipeId}/comments`),
+  addComment: (recipeId, body) => request(`/api/recipes/${recipeId}/comments`, asJson({ body })),
+  deleteComment: commentId => request(`/api/comments/${commentId}`, { method: 'DELETE' }),
 
-  rate: (recipeId, like) => request(`/like/${recipeId}`, asJson({ like }))
+  rate: (recipeId, like) => request(`/api/recipes/${recipeId}/like`, asJson({ like }))
 }
