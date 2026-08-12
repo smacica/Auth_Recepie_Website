@@ -1,10 +1,16 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import RatingButtons from '../components/RatingButtons.vue'
+import DeleteRecipeButton from '../components/DeleteRecipeButton.vue'
 import { api } from '../api'
+import { useAuth } from '../composables/useAuth'
 
 const route = useRoute()
+const router = useRouter()
+const { user } = useAuth()
+
+const isMine = computed(() => Boolean(user.value && recipe.value && user.value.user_id === recipe.value.user_id))
 const recipe = ref(null)
 const loading = ref(true)
 const failed = ref(false)
@@ -45,11 +51,19 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
           <p class="eyebrow">{{ recipe.date }}</p>
           <h1>{{ recipe.name }}</h1>
           <p class="detail__info">{{ recipe.info }}</p>
-          <RatingButtons
-            :recipe-id="recipe.recipe_id"
-            :likes="recipe.likes"
-            :dislikes="recipe.dislikes"
-          />
+          <div class="detail__controls">
+            <RatingButtons
+              :recipe-id="recipe.recipe_id"
+              :likes="recipe.likes"
+              :dislikes="recipe.dislikes"
+            />
+            <DeleteRecipeButton
+              v-if="isMine"
+              :recipe-id="recipe.recipe_id"
+              label="Delete recipe"
+              @deleted="router.push('/my-recipes')"
+            />
+          </div>
         </div>
         <img
           v-if="recipe.photo && !broken"
@@ -101,6 +115,13 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
   gap: 40px;
   align-items: center;
   margin-bottom: 48px;
+}
+
+.detail__controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .detail__info {

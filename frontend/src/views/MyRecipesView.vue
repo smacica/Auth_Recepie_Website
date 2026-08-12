@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import RecipeCard from '../components/RecipeCard.vue'
+import DeleteRecipeButton from '../components/DeleteRecipeButton.vue'
 import { api } from '../api'
 
 const recipes = ref([])
@@ -12,6 +13,10 @@ const totals = computed(() => ({
   likes: recipes.value.reduce((sum, recipe) => sum + recipe.likes, 0),
   dislikes: recipes.value.reduce((sum, recipe) => sum + recipe.dislikes, 0)
 }))
+
+const onDeleted = id => {
+  recipes.value = recipes.value.filter(recipe => recipe.recipe_id !== id)
+}
 
 onMounted(async () => {
   try {
@@ -60,7 +65,10 @@ onMounted(async () => {
     </div>
 
     <div v-else class="recipe-grid">
-      <RecipeCard v-for="recipe in recipes" :key="recipe.recipe_id" :recipe="recipe" />
+      <div v-for="recipe in recipes" :key="recipe.recipe_id" class="mine__item">
+        <RecipeCard :recipe="recipe" />
+        <DeleteRecipeButton :recipe-id="recipe.recipe_id" @deleted="onDeleted" />
+      </div>
     </div>
   </div>
 </template>
@@ -108,5 +116,16 @@ onMounted(async () => {
 
 .mine__stat span {
   font-size: 0.85rem;
+}
+
+.mine__item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.mine__item > :first-child {
+  width: 100%;
 }
 </style>
