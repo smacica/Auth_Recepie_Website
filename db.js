@@ -14,8 +14,15 @@ CREATE TABLE IF NOT EXISTS users (
     google_id TEXT,
     username TEXT NOT NULL UNIQUE,
     email TEXT,
+    password TEXT,
+    email_verified INTEGER NOT NULL DEFAULT 0,
     profile_pic TEXT,
     bio TEXT
+);
+CREATE TABLE IF NOT EXISTS email_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    expires INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS recipes (
     recipe_id INTEGER PRIMARY KEY,
@@ -44,7 +51,10 @@ CREATE TABLE IF NOT EXISTS likes (
 //through an index instead - that also lets several rows stay NULL
 const indexQuerry = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);`
 
-//brings a database created before google sign in up to the current shape
+//google accounts are trusted, google already checked the address
+const verifyGoogleUsersQuerry = `UPDATE users SET email_verified = 1 WHERE google_id IS NOT NULL AND email_verified = 0;`
+
+//brings an older database up to the current shape
 function migrateUsers(){
     return new Promise((resolve, reject) => {
         db.all(`PRAGMA table_info(users);`,(err, columns)=>{
@@ -52,14 +62,24 @@ function migrateUsers(){
                 return reject(new Error(err))
             }
             const names = columns.map(column => column.name)
+            const password = columns.find(column => column.name === 'password')
             const steps = []
+
             if(!names.includes('google_id')){
                 steps.push(`ALTER TABLE users ADD COLUMN google_id TEXT;`)
             }
-            //passwords are gone, everyone signs in through google now
-            if(names.includes('password')){
+            //the original column was NOT NULL, which blocks google-only accounts.
+            //sqlite cannot relax that in place, so drop it and add it back nullable.
+            if(password && password.notnull){
                 steps.push(`ALTER TABLE users DROP COLUMN password;`)
             }
+            if(!password || password.notnull){
+                steps.push(`ALTER TABLE users ADD COLUMN password TEXT;`)
+            }
+            if(!names.includes('email_verified')){
+                steps.push(`ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0;`)
+            }
+
             if(!steps.length){
                 return resolve()
             }
@@ -67,7 +87,7 @@ function migrateUsers(){
                 if(err){
                     reject(new Error(err))
                 }else{
-                    console.log('users table migrated to google sign in')
+                    console.log('users table migrated')
                     resolve()
                 }
             })
@@ -92,7 +112,7 @@ let db = new sqlite3.Database(dbPath, (err) => {
                 return console.log(err)
             }
             migrateUsers().then(()=>{
-                db.exec(indexQuerry,(err)=>{
+                db.exec(indexQuerry + verifyGoogleUsersQuerry,(err)=>{
                     if(err){
                         console.log(err)
                     }
@@ -289,11 +309,19 @@ function dbMyRecipes(user_id){
     })
 }
 
-const userCreateQuery = `INSERT INTO users(google_id, username, email, profile_pic, bio) VALUES(?,?,?,?,?)
+const userCreateQuery = `INSERT INTO users(google_id, username, email, password, email_verified, profile_pic, bio) VALUES(?,?,?,?,?,?,?)
 `
 function dbCreateUser(data){
     return new Promise((resolve, reject) => {
-        const values = [data.google_id, data.username, data.email, data.profile_pic, data.bio]
+        const values = [
+            data.google_id || null,
+            data.username,
+            data.email,
+            data.password || null,
+            data.email_verified ? 1 : 0,
+            data.profile_pic || null,
+            data.bio
+        ]
         db.run(userCreateQuery ,values, function(err){
             if(err){
                 reject(new Error(err))
@@ -301,6 +329,66 @@ function dbCreateUser(data){
                 resolve(this.lastID)
             }
             });
+    })
+}
+
+//emails are compared lowercase so Ann@x.com and ann@x.com cannot both sign up
+function dbFindByEmail(email){
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1;`,[email],(err, data)=>{
+            if(err){
+                reject(new Error(err))
+            }else{
+                resolve(data[0])
+            }
+        })
+    })
+}
+
+//one live token per user, so asking for a new mail invalidates the older link
+function dbCreateEmailToken(user_id, token, expires){
+    return new Promise((resolve, reject) => {
+        db.run(`DELETE FROM email_tokens WHERE user_id = ?;`,[user_id],(err)=>{
+            if(err){
+                return reject(new Error(err))
+            }
+            db.run(`INSERT INTO email_tokens(token, user_id, expires) VALUES(?,?,?);`,[token, user_id, expires],(err)=>{
+                if(err){
+                    reject(new Error(err))
+                }else{
+                    resolve(token)
+                }
+            })
+        })
+    })
+}
+
+//marks the address confirmed and burns the token, returns the user or null
+function dbConsumeEmailToken(token){
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT * FROM email_tokens WHERE token = ? LIMIT 1;`,[token],(err, rows)=>{
+            if(err){
+                return reject(new Error(err))
+            }
+            const row = rows[0]
+            if(!row){
+                return resolve(null)
+            }
+            db.run(`DELETE FROM email_tokens WHERE token = ?;`,[token],(err)=>{
+                if(err){
+                    return reject(new Error(err))
+                }
+                if(row.expires < Date.now()){
+                    return resolve({ expired: true })
+                }
+                db.run(`UPDATE users SET email_verified = 1 WHERE user_id = ?;`,[row.user_id],(err)=>{
+                    if(err){
+                        return reject(new Error(err))
+                    }
+                    dbFind('users','user_id',row.user_id).then(resolve).catch(err=>reject(new Error(err)))
+                })
+            })
+        })
     })
 }
 
@@ -325,10 +413,12 @@ async function dbFindOrCreateGoogleUser(profile){
     }
 
     if(profile.email){
-        const byEmail = await dbFind('users','email',profile.email)
+        const byEmail = await dbFindByEmail(profile.email)
         if(byEmail){
-            //link the existing account to google instead of making a duplicate
+            //link the existing account to google instead of making a duplicate.
+            //google vouches for the address, so the account counts as verified.
             await dbUpdate('users','user_id',byEmail.user_id,'google_id',profile.google_id)
+            await dbUpdate('users','user_id',byEmail.user_id,'email_verified','1')
             if(profile.profile_pic){
                 await dbUpdate('users','user_id',byEmail.user_id,'profile_pic',profile.profile_pic)
             }
@@ -341,7 +431,25 @@ async function dbFindOrCreateGoogleUser(profile){
         google_id: profile.google_id,
         username,
         email: profile.email,
+        email_verified: true,
         profile_pic: profile.profile_pic,
+        bio: 'Just joined EatHub.'
+    })
+    return dbFind('users','user_id',user_id)
+}
+
+//signup with an address and a password - unverified until the emailed link is opened
+async function dbCreateLocalUser({ email, password, username }){
+    const taken = await dbFindByEmail(email)
+    if(taken){
+        return null
+    }
+    const name = await uniqueUsername(username || email.split('@')[0])
+    const user_id = await dbCreateUser({
+        username: name,
+        email,
+        password,
+        email_verified: false,
         bio: 'Just joined EatHub.'
     })
     return dbFind('users','user_id',user_id)
@@ -415,4 +523,4 @@ function dbDel(table,column, value, column2=false, value2=false){
     })
 }
 
-module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbCreateUser, dbFindOrCreateGoogleUser, insertRecipe, dbMyRecipes, addLike, getMostLiked, handlelike }
+module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, addLike, getMostLiked, handlelike }
