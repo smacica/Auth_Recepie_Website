@@ -65,6 +65,11 @@ export const api = {
   getRecipe: async id => normaliseRecipe(await request(`/api/recipes/${id}`)),
 
   createRecipe: formData => request('/api/recipes', { method: 'POST', body: formData }),
+
+  getAiQuota: () => request('/api/ai/quota'),
+  generateRecipe: (ingredients, description) =>
+    request('/api/recipes/generate', asJson({ ingredients, description })),
+
   deleteRecipe: id => request(`/api/recipes/${id}`, { method: 'DELETE' }),
 
   getComments: recipeId => request(`/api/recipes/${recipeId}/comments`),

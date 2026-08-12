@@ -12,6 +12,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/generate',
+    name: 'generate',
+    component: () => import('../views/GenerateRecipeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/my-recipes',
     name: 'my-recipes',
     component: () => import('../views/MyRecipesView.vue'),
