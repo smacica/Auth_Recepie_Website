@@ -4,9 +4,82 @@ Recipe sharing site. Express + SQLite API, Vue 3 frontend. Sign in with Google o
 with an email address confirmed by a verification link.
 
 ```
-.                     express api (routes/, db.js, google_strategy.js)
+.                     express api (routes/, db.js, gemini.js, ai_quota.js)
+├── shared/           code both sides import (ingredient emoji rules)
 └── frontend/         vue 3 + vite app, builds into frontend/dist
 ```
+
+`shared/ingredients.mjs` is written as ESM and used by both: Vite imports it through
+the `@shared` alias, and the Express side reaches it with `require()`, which Node
+supports for ESM. One copy of the emoji rules, no drift.
+
+---
+
+## AI recipe generation
+
+Signed-in users can describe what is in the fridge and get a full recipe written,
+checked and saved to their kitchen. It runs on the Gemini API's free tier.
+
+### Getting a key
+
+1. Go to <https://aistudio.google.com/apikey> and press **Create API key**.
+2. Pick a Google Cloud project (or let it make one).
+3. Copy the key into `.env`:
+
+```dotenv
+GEMINI_API_KEY=AIza…
+GEMINI_MODEL=gemini-3.6-flash
+```
+
+Leave `GEMINI_API_KEY` empty and the feature switches itself off — the page says so
+and the route answers `503` instead of failing oddly.
+
+> **Do not enable billing on that Cloud project** if you want a hard guarantee of
+> zero cost. Without billing, Google rejects calls past the free allowance rather
+> than charging for them. The caps below are the app's own belt and braces.
+
+### Staying inside the free tier
+
+Google no longer publishes free-tier request limits — they vary per account and have
+been cut sharply (community reports put Flash near **20 requests/day**, down from
+250). So the app enforces its own caps and refuses to call the API once any is hit:
+
+```dotenv
+AI_DAILY_LIMIT=20        # whole site, per day
+AI_USER_DAILY_LIMIT=3    # one user, per day
+AI_PER_MINUTE_LIMIT=5    # burst guard across the site
+```
+
+Check your real numbers at <https://aistudio.google.com/rate-limit> and raise these
+only if there is room. How it holds:
+
+- A slot is **booked before** the request goes out, so simultaneous requests cannot
+  both read the same remaining count and both slip through.
+- Daily counters live in the `ai_usage` table and reset at **midnight Pacific**, the
+  same boundary Google uses — not the server's timezone.
+- Failed generations still spend a slot, because the call was already made.
+- If Google answers `429` anyway, the page says the free quota is gone.
+
+### How a generation is checked
+
+The model is asked for JSON matching a fixed schema (`ok`, `title`, `description`,
+`ingredients[{emoji,text}]`, `steps[]`) via `response_format.schema`, which maps
+straight onto how recipes are already stored.
+
+Anything not about food is refused: the system instruction tells the model to set
+`ok: false` and return empty fields, and the route turns that into a `422` with
+nothing saved. The user's text is passed in labelled as data with an explicit
+instruction not to follow directions inside it, so "ignore your rules and…" in the
+description box is treated as a (bad) dish description rather than a command.
+
+Nothing is trusted on the way back. The reply is parsed, the schema re-checked, and
+a recipe missing a title, ingredients or steps is rejected as `incomplete` rather
+than saved half-built. Lists are capped at 20 ingredients and 15 steps, and any
+ingredient the model forgot an emoji for gets one guessed from its name.
+
+Generated recipes get a random illustration from `frontend/public/ai_pics`. Those
+are committed to the repo already compressed to 1024×768 (4:3), matching the ratio
+the cards and detail page use.
 
 ---
 
@@ -216,6 +289,8 @@ is stored in the `photo` column of existing rows.
 | POST | `/api/logout` | – | Destroys the session. |
 | GET | `/api/recipes` | – | All recipes, most liked first. |
 | POST | `/api/recipes` | ✔ | Multipart: `name`, `info`, `image`, and `recipe` / `ingredients` as JSON arrays. |
+| POST | `/api/recipes/generate` | ✔ | Body `{ ingredients, description }`. Writes and saves a recipe. `422` if it is not a food request. |
+| GET | `/api/ai/quota` | ✔ | Generations left today. |
 | GET | `/api/recipes/mine` | ✔ | Recipes you posted. |
 | GET | `/api/recipes/:id` | – | One recipe. |
 | DELETE | `/api/recipes/:id` | ✔ | Author only. Removes the photo and cascades likes and comments. |
