@@ -247,6 +247,28 @@ function insertRecipe(recipe){
     })
 } 
 
+//only the author may delete. ranking and likes rows go with it through
+//ON DELETE CASCADE, so this is a single statement.
+function dbDeleteRecipe(recipe_id, user_id){
+    return new Promise((resolve, reject) => {
+        dbFind('recipes','recipe_id',recipe_id).then(recipe=>{
+            if(!recipe){
+                return resolve({ deleted: false, reason: 'missing' })
+            }
+            if(recipe.user_id !== user_id){
+                return resolve({ deleted: false, reason: 'forbidden' })
+            }
+            db.run(`DELETE FROM recipes WHERE recipe_id = ?;`,[recipe_id],(err)=>{
+                if(err){
+                    reject(new Error(err))
+                }else{
+                    resolve({ deleted: true, photo: recipe.photo })
+                }
+            })
+        }).catch(err=>reject(new Error(err)))
+    })
+}
+
 const likeQuerry = `INSERT INTO
  likes (user_id, recipe_id)
  values(?,?);`
@@ -523,4 +545,4 @@ function dbDel(table,column, value, column2=false, value2=false){
     })
 }
 
-module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, addLike, getMostLiked, handlelike }
+module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, dbDeleteRecipe, addLike, getMostLiked, handlelike }
