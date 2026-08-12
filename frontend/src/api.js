@@ -17,13 +17,15 @@ const request = async (url, options = {}) => {
   }
 }
 
-// recipe + ingredients come back as JSON strings from sqlite
-const parseList = value => {
+// recipe + ingredients come back as JSON strings from sqlite. rows written before
+// the upload fix are encoded twice, so unwrap until an array falls out.
+const parseList = (value, depth = 0) => {
   if (Array.isArray(value)) return value
   if (!value) return []
+  if (depth > 2) return [String(value)]
+
   try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed : [String(parsed)]
+    return parseList(JSON.parse(value), depth + 1)
   } catch {
     return [String(value)]
   }
