@@ -1,11 +1,14 @@
 const express = require('express')
 const router = express.Router()
-const {dbFind, dbRecipes, dbMyRecipes, insertRecipe, handlelike, getMostLiked} = require('../db');
+const {dbFind, dbRecipes, dbMyRecipes, insertRecipe, dbDeleteRecipe, handlelike, getMostLiked} = require('../db');
 const { isLoggedIn } = require('../google_strategy');
 const {upload}  = require('../file_uploud')
 const uuid = require('uuid').v4
 const path = require('path')
+const fs = require('fs')
 const date = require('../aditional_functions/get_current_date')
+
+const picsDir = path.join(__dirname, '..', 'data', 'recipes_pics')
 
 
 function generateRecipeId(req, res, next){
@@ -56,6 +59,34 @@ router.post('/createRecipe',isLoggedIn,generateRecipeId, upload.single('image'),
 })
 
 
+router.delete('/recipe/:id',isLoggedIn,(req,res)=>{
+  const id = parseInt(req.params.id)
+  if(Number.isNaN(id)){
+    return res.status(400).json({message: "bad recipe id"})
+  }
+
+  dbDeleteRecipe(id, req.user.user_id).then(result=>{
+    if(!result.deleted){
+      const status = result.reason === 'forbidden' ? 403 : 404
+      const message = result.reason === 'forbidden' ? "that is not your recipe" : "recipe not found"
+      return res.status(status).json({message})
+    }
+
+    //the row is gone either way, a leftover file is not worth failing the request over
+    if(result.photo){
+      fs.unlink(path.join(picsDir, path.basename(result.photo)),(err)=>{
+        if(err && err.code !== 'ENOENT'){
+          console.log(err)
+        }
+      })
+    }
+    res.json({message: "recipe deleted"})
+  }).catch(err=>{
+    console.log(err)
+    res.status(500).json({message: "could not delete the recipe"})
+  })
+})
+
 router.post('/like/:recipe_id',isLoggedIn,(req,res)=>{
   handlelike(req.params.recipe_id, req.user.user_id, req.body.like).then((success)=>{
     if(success){
@@ -66,7 +97,6 @@ router.post('/like/:recipe_id',isLoggedIn,(req,res)=>{
   })
 })
 
-const picsDir = path.join(__dirname, '..', 'data', 'recipes_pics')
 router.get('/data/recipes_pics/:filename', (req, res) => {
     //basename keeps a crafted filename from walking out of the pictures folder
     res.sendFile(path.join(picsDir, path.basename(req.params.filename)), err => {
