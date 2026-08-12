@@ -79,8 +79,11 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
       <div class="detail__body">
         <aside class="panel detail__ingredients">
           <h2>Ingredients</h2>
-          <ul>
-            <li v-for="(item, index) in recipe.ingredients" :key="index">{{ item }}</li>
+          <ul class="tag-list">
+            <li v-for="(item, index) in recipe.ingredients" :key="index" class="tag">
+              <span class="tag__emoji" aria-hidden="true">{{ item.emoji }}</span>
+              <span>{{ item.text }}</span>
+            </li>
           </ul>
           <p v-if="!recipe.ingredients.length" class="muted">No ingredients listed.</p>
         </aside>
@@ -165,29 +168,6 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
 .detail__ingredients h2,
 .detail__steps h2 {
   font-size: 1.35rem;
-}
-
-.detail__ingredients ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.detail__ingredients li {
-  padding: 9px 0 9px 26px;
-  border-bottom: 1px dashed var(--line);
-  position: relative;
-}
-
-.detail__ingredients li::before {
-  content: "🥄";
-  position: absolute;
-  left: 0;
-  font-size: 0.85rem;
-}
-
-.detail__ingredients li:last-child {
-  border-bottom: 0;
 }
 
 .detail__steps ol {
