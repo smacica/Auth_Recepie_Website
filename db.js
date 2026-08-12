@@ -1,7 +1,46 @@
 const uuid = require('uuid').v4
 const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs')
+const path = require('path')
 
-let db = new sqlite3.Database("./data/main.db", (err) => {
+//the data folder is gitignored, so create it before sqlite tries to open the db file
+const dataDir = path.join(__dirname, 'data')
+fs.mkdirSync(path.join(dataDir, 'recipes_pics'), { recursive: true })
+const dbPath = path.join(dataDir, 'main.db')
+
+const schemaQuerry = `
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT,
+    password TEXT NOT NULL,
+    profile_pic TEXT,
+    bio TEXT
+);
+CREATE TABLE IF NOT EXISTS recipes (
+    recipe_id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    name TEXT,
+    photo TEXT,
+    info TEXT,
+    recipe TEXT,
+    date TEXT,
+    ingredients TEXT
+);
+CREATE TABLE IF NOT EXISTS ranking (
+    recipe_id INTEGER PRIMARY KEY REFERENCES recipes(recipe_id) ON DELETE CASCADE,
+    likes INTEGER DEFAULT 0,
+    dislikes INTEGER DEFAULT 0,
+    views INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS likes (
+    like_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id INTEGER REFERENCES recipes(recipe_id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
+    rating INTEGER
+);`
+
+let db = new sqlite3.Database(dbPath, (err) => {
 
     if(err)
     {
@@ -9,6 +48,11 @@ let db = new sqlite3.Database("./data/main.db", (err) => {
     }else{
         console.log('sqlite connected')
         db.get("PRAGMA foreign_keys = ON",(err,data)=>{
+            if(err){
+                console.log(err)
+            }
+        })
+        db.exec(schemaQuerry,(err)=>{
             if(err){
                 console.log(err)
             }
@@ -81,6 +125,10 @@ async function getRecipes(data){
     console.log(data)
     let recipes = []
     return new Promise(async(resolve, reject) => {
+        //without this the promise never settles on an empty table and the request hangs
+        if(data.length == 0){
+            return resolve(recipes)
+        }
         for(const rank of data){
             const recipe = await dbFind("recipes","recipe_id",rank.recipe_id)
               let recipeWithLike = recipe
@@ -168,6 +216,10 @@ function dbRecipes(){
 async function addLikesToMyRecipes(data){
     let finalResult = []
     return new Promise(async(resolve, reject) => {
+        //without this the promise never settles on an empty table and the request hangs
+        if(data.length == 0){
+            return resolve(finalResult)
+        }
         data.forEach(async(recipe)=>{
             const rating = await dbFind('ranking','recipe_id',recipe.recipe_id)
             recipe.likes = rating.likes
