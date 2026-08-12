@@ -62,6 +62,7 @@ export const api = {
   getRecipe: async id => normaliseRecipe(await request(`/recipe/${id}`)),
 
   createRecipe: formData => request('/createRecipe', { method: 'POST', body: formData }),
+  deleteRecipe: id => request(`/recipe/${id}`, { method: 'DELETE' }),
 
   rate: (recipeId, like) => request(`/like/${recipeId}`, asJson({ like }))
 }
