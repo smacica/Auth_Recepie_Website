@@ -244,12 +244,21 @@ router.delete('/api/comments/:comment_id',isLoggedIn,(req,res)=>{
 })
 
 router.post('/api/recipes/:recipe_id/like',isLoggedIn,(req,res)=>{
-  handlelike(req.params.recipe_id, req.user.user_id, req.body.like).then((success)=>{
+  const like = Number(req.body.like)
+  if(like !== 0 && like !== 1){
+    return res.status(400).json({message: "like must be 1 or 0"})
+  }
+
+  handlelike(req.params.recipe_id, req.user.user_id, like).then((success)=>{
     if(success){
       res.json({action: success})
     }else{
       res.json({err: "unseccessful"})
     }
+  }).catch(err=>{
+    //without this a rejection left the request open until the browser gave up
+    console.log(err)
+    res.status(500).json({message: "could not record the vote"})
   })
 })
 
@@ -262,12 +271,12 @@ router.get('/data/recipes_pics/:filename', (req, res) => {
     });
   });
 router.get('/api/recipes', (req, res) => {
-
-    getMostLiked().then((data=>{
+    getMostLiked().then(data=>{
       res.json(data)
-    }))
-
-
+    }).catch(err=>{
+      console.log(err)
+      res.status(500).json({message: "could not load the recipes"})
+    })
   });
 
 //has to stay above /api/recipes/:id, otherwise "mine" is read as an id
