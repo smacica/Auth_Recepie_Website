@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const {dbFind, dbRecipes, dbMyRecipes, insertRecipe, dbDeleteRecipe, handlelike, getMostLiked} = require('../db');
+const {dbFind, dbRecipes, dbMyRecipes, insertRecipe, dbDeleteRecipe, dbComments, dbAddComment, dbDeleteComment, handlelike, getMostLiked} = require('../db');
 const { isLoggedIn } = require('../google_strategy');
 const {upload}  = require('../file_uploud')
 const uuid = require('uuid').v4
@@ -84,6 +84,70 @@ router.delete('/recipe/:id',isLoggedIn,(req,res)=>{
   }).catch(err=>{
     console.log(err)
     res.status(500).json({message: "could not delete the recipe"})
+  })
+})
+
+const COMMENT_MAX = 1000
+
+router.get('/recipe/:id/comments',(req,res)=>{
+  const id = parseInt(req.params.id)
+  if(Number.isNaN(id)){
+    return res.status(400).json({message: "bad recipe id"})
+  }
+  dbComments(id).then(comments=>{
+    res.json(comments)
+  }).catch(err=>{
+    console.log(err)
+    res.status(500).json({message: "could not load the comments"})
+  })
+})
+
+router.post('/recipe/:id/comments',isLoggedIn,(req,res)=>{
+  const id = parseInt(req.params.id)
+  const body = String(req.body.body || '').trim()
+
+  if(Number.isNaN(id)){
+    return res.status(400).json({message: "bad recipe id"})
+  }
+  if(!body){
+    return res.status(400).json({message: "write something first"})
+  }
+  if(body.length > COMMENT_MAX){
+    return res.status(400).json({message: `keep it under ${COMMENT_MAX} characters`})
+  }
+
+  dbFind('recipes','recipe_id',id).then(recipe=>{
+    if(!recipe){
+      return res.status(404).json({message: "recipe not found"})
+    }
+    dbAddComment(id, req.user.user_id, body).then(comment=>{
+      res.status(201).json(comment)
+    }).catch(err=>{
+      console.log(err)
+      res.status(500).json({message: "could not save the comment"})
+    })
+  }).catch(err=>{
+    console.log(err)
+    res.status(500).json({message: "could not save the comment"})
+  })
+})
+
+router.delete('/comments/:comment_id',isLoggedIn,(req,res)=>{
+  const id = parseInt(req.params.comment_id)
+  if(Number.isNaN(id)){
+    return res.status(400).json({message: "bad comment id"})
+  }
+
+  dbDeleteComment(id, req.user.user_id).then(result=>{
+    if(!result.deleted){
+      const status = result.reason === 'forbidden' ? 403 : 404
+      const message = result.reason === 'forbidden' ? "that is not your comment" : "comment not found"
+      return res.status(status).json({message})
+    }
+    res.json({message: "comment deleted"})
+  }).catch(err=>{
+    console.log(err)
+    res.status(500).json({message: "could not delete the comment"})
   })
 })
 
