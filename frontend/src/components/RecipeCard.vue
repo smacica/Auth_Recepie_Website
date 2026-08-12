@@ -1,19 +1,25 @@
 <script setup>
+import { ref } from 'vue'
+
 const props = defineProps({
   recipe: { type: Object, required: true }
 })
 
-const fallback = '/data/recipes_pics/noUpload.jpg'
-const onImageError = event => {
-  if (event.target.src.endsWith(fallback)) return
-  event.target.src = fallback
-}
+// recipes posted without a photo (or with a missing file) get a drawn placeholder
+const broken = ref(false)
 </script>
 
 <template>
   <RouterLink :to="`/recipe/${props.recipe.recipe_id}`" class="rcard card">
     <div class="rcard__media">
-      <img :src="props.recipe.photo || fallback" :alt="props.recipe.name" loading="lazy" @error="onImageError" />
+      <img
+        v-if="props.recipe.photo && !broken"
+        :src="props.recipe.photo"
+        :alt="props.recipe.name"
+        loading="lazy"
+        @error="broken = true"
+      />
+      <div v-else class="rcard__placeholder" aria-hidden="true">🍲</div>
       <span class="rcard__score" :title="`${props.recipe.likes} likes / ${props.recipe.dislikes} dislikes`">
         👍 {{ props.recipe.likes }}
       </span>
@@ -55,6 +61,15 @@ const onImageError = event => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.rcard__placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  background: linear-gradient(150deg, var(--cream-deep), rgba(232, 163, 61, 0.3));
 }
 
 .rcard__score {

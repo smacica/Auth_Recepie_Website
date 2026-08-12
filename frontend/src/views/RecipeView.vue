@@ -9,14 +9,12 @@ const recipe = ref(null)
 const loading = ref(true)
 const failed = ref(false)
 
-const fallback = '/data/recipes_pics/noUpload.jpg'
-const onImageError = event => {
-  if (!event.target.src.endsWith(fallback)) event.target.src = fallback
-}
+const broken = ref(false)
 
 const fetchRecipe = async id => {
   loading.value = true
   failed.value = false
+  broken.value = false
   try {
     recipe.value = await api.getRecipe(id)
     if (!recipe.value?.recipe_id) failed.value = true
@@ -54,11 +52,13 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
           />
         </div>
         <img
+          v-if="recipe.photo && !broken"
           class="detail__photo"
-          :src="recipe.photo || fallback"
+          :src="recipe.photo"
           :alt="recipe.name"
-          @error="onImageError"
+          @error="broken = true"
         />
+        <div v-else class="detail__photo detail__photo--empty" aria-hidden="true">🍲</div>
       </header>
 
       <div class="detail__body">
@@ -116,6 +116,13 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-md);
+}
+
+.detail__photo--empty {
+  display: grid;
+  place-items: center;
+  font-size: 4.5rem;
+  background: linear-gradient(150deg, var(--cream-deep), rgba(232, 163, 61, 0.3));
 }
 
 .detail__body {
