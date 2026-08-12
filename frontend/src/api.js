@@ -1,3 +1,5 @@
+import { normaliseIngredients } from '@shared/ingredients.mjs'
+
 // thin wrapper around fetch - every call carries the session cookie
 const request = async (url, options = {}) => {
   const response = await fetch(url, { credentials: 'include', ...options })
@@ -43,8 +45,9 @@ const parseList = (value, depth = 0) => {
 
 const normaliseRecipe = recipe => ({
   ...recipe,
-  steps: parseList(recipe.recipe),
-  ingredients: parseList(recipe.ingredients),
+  steps: parseList(recipe.recipe).map(step => (typeof step === 'string' ? step : String(step))),
+  // older rows hold plain strings, newer ones {emoji, text}
+  ingredients: normaliseIngredients(parseList(recipe.ingredients)),
   likes: recipe.likes ?? 0,
   dislikes: recipe.dislikes ?? 0
 })

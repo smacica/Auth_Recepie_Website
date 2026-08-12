@@ -7,6 +7,7 @@ const uuid = require('uuid').v4
 const path = require('path')
 const fs = require('fs')
 const date = require('../aditional_functions/get_current_date')
+const { normaliseIngredients } = require('../shared/ingredients.mjs')
 
 const picsDir = path.join(__dirname, '..', 'data', 'recipes_pics')
 
@@ -47,7 +48,8 @@ router.post('/api/recipes',isLoggedIn,generateRecipeId, upload.single('image'), 
     info: req.body.info,
     recipe: parseList(req.body.recipe),
     date: date(),
-    ingredients: parseList(req.body.ingredients)
+    //accepts plain strings too, and fills in an emoji when none was picked
+    ingredients: normaliseIngredients(parseList(req.body.ingredients))
   }
 
   insertRecipe(recipe).then(()=>{
