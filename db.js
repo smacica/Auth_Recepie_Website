@@ -53,7 +53,13 @@ CREATE TABLE IF NOT EXISTS comments (
     body TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_comments_recipe ON comments(recipe_id);`
+CREATE INDEX IF NOT EXISTS idx_comments_recipe ON comments(recipe_id);
+CREATE TABLE IF NOT EXISTS ai_usage (
+    day TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    calls INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, user_id)
+);`
 
 //sqlite cannot add a UNIQUE column with ALTER TABLE, so google_id is kept unique
 //through an index instead - that also lets several rows stay NULL
@@ -274,6 +280,45 @@ function dbDeleteRecipe(recipe_id, user_id){
                 }
             })
         }).catch(err=>reject(new Error(err)))
+    })
+}
+
+/* ---------- ai usage ---------- */
+
+//user_id 0 is the row that counts every call, whoever made it
+const TOTAL_ROW = 0
+
+//how many calls have gone out today, in total and for this one user
+function dbAiUsage(day, user_id){
+    return new Promise((resolve, reject) => {
+        db.all(`SELECT user_id, calls FROM ai_usage WHERE day = ? AND user_id IN (?, ?);`,
+        [day, TOTAL_ROW, user_id],(err, rows)=>{
+            if(err){
+                return reject(new Error(err))
+            }
+            const find = id => rows.find(row => row.user_id === id)?.calls || 0
+            resolve({ total: find(TOTAL_ROW), user: find(user_id) })
+        })
+    })
+}
+
+//counted before the call goes out, so a crash mid-request cannot leak free quota
+function dbAiUsageIncrement(day, user_id){
+    const bump = `INSERT INTO ai_usage(day, user_id, calls) VALUES(?,?,1)
+    ON CONFLICT(day, user_id) DO UPDATE SET calls = calls + 1;`
+    return new Promise((resolve, reject) => {
+        db.run(bump,[day, TOTAL_ROW],(err)=>{
+            if(err){
+                return reject(new Error(err))
+            }
+            db.run(bump,[day, user_id],(err)=>{
+                if(err){
+                    reject(new Error(err))
+                }else{
+                    resolve()
+                }
+            })
+        })
     })
 }
 
@@ -619,4 +664,4 @@ function dbDel(table,column, value, column2=false, value2=false){
     })
 }
 
-module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, dbDeleteRecipe, dbComments, dbAddComment, dbDeleteComment, addLike, getMostLiked, handlelike }
+module.exports = { dbUpdate, dbDel, dbRecipes, dbFind, dbFindByEmail, dbCreateUser, dbCreateLocalUser, dbFindOrCreateGoogleUser, dbCreateEmailToken, dbConsumeEmailToken, insertRecipe, dbMyRecipes, dbDeleteRecipe, dbComments, dbAddComment, dbDeleteComment, dbAiUsage, dbAiUsageIncrement, addLike, getMostLiked, handlelike }
