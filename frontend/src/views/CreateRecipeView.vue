@@ -1,24 +1,38 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import EmojiPicker from '../components/EmojiPicker.vue'
 import { api } from '../api'
+import { suggestEmoji, DEFAULT_EMOJI } from '@shared/ingredients.mjs'
 
 const router = useRouter()
 
+const emptyIngredient = () => ({ emoji: DEFAULT_EMOJI, text: '', picked: false })
+
 const name = ref('')
 const info = ref('')
-const ingredients = ref([''])
+const ingredients = ref([emptyIngredient()])
 const steps = ref([''])
+
+// follow along while they type, but stop as soon as they pick one by hand
+const onIngredientText = index => {
+  const row = ingredients.value[index]
+  if (!row.picked) row.emoji = suggestEmoji(row.text)
+}
+
+const onEmojiPicked = index => {
+  ingredients.value[index].picked = true
+}
 const image = ref(null)
 const preview = ref(null)
 
 const error = ref('')
 const saving = ref(false)
 
-const addRow = list => list.value.push('')
-const removeRow = (list, index) => {
+const addRow = (list, blank = '') => list.value.push(blank)
+const removeRow = (list, index, blank = '') => {
   list.value.splice(index, 1)
-  if (!list.value.length) list.value.push('')
+  if (!list.value.length) list.value.push(blank)
 }
 
 const onFile = event => {
@@ -30,7 +44,9 @@ const onFile = event => {
 const submit = async () => {
   error.value = ''
 
-  const cleanIngredients = ingredients.value.map(item => item.trim()).filter(Boolean)
+  const cleanIngredients = ingredients.value
+    .map(item => ({ emoji: item.emoji, text: item.text.trim() }))
+    .filter(item => item.text)
   const cleanSteps = steps.value.map(step => step.trim()).filter(Boolean)
 
   if (!name.value.trim()) return (error.value = 'Give the dish a name.')
@@ -84,11 +100,27 @@ const submit = async () => {
 
       <div class="panel">
         <h2>Ingredients</h2>
+        <p class="muted create__hint">The emoji is guessed from what you type — click it to change it.</p>
         <div v-for="(item, index) in ingredients" :key="`ing-${index}`" class="create__row">
-          <input v-model="ingredients[index]" type="text" placeholder="200 g spaghetti" />
-          <button type="button" class="create__remove" title="Remove" @click="removeRow(ingredients, index)">✕</button>
+          <EmojiPicker v-model="item.emoji" @update:modelValue="onEmojiPicked(index)" />
+          <input
+            v-model="item.text"
+            type="text"
+            placeholder="200 g spaghetti"
+            @input="onIngredientText(index)"
+          />
+          <button
+            type="button"
+            class="create__remove"
+            title="Remove"
+            @click="removeRow(ingredients, index, emptyIngredient())"
+          >
+            ✕
+          </button>
         </div>
-        <button type="button" class="btn btn--ghost btn--sm" @click="addRow(ingredients)">+ Ingredient</button>
+        <button type="button" class="btn btn--ghost btn--sm" @click="addRow(ingredients, emptyIngredient())">
+          + Ingredient
+        </button>
       </div>
 
       <div class="panel">
@@ -132,6 +164,12 @@ const submit = async () => {
 .create__form h2 {
   font-size: 1.25rem;
   margin-bottom: 14px;
+}
+
+.create__hint {
+  margin-top: -8px;
+  margin-bottom: 16px;
+  font-size: 0.86rem;
 }
 
 .create__row {
