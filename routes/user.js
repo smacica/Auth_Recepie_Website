@@ -22,13 +22,13 @@ function looksLikeEmail(value){
     return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
-router.get('/auth', isLoggedIn, function(req, res) {
+router.get('/api/auth', isLoggedIn, function(req, res) {
     res.json({message: 'you are authorized'});
 });
 
 /* ---------- email + password ---------- */
 
-router.post('/signup', async function(req, res){
+router.post('/api/signup', async function(req, res){
     const email = String(req.body.email || '').trim()
     const password = String(req.body.password || '')
 
@@ -63,7 +63,7 @@ router.post('/signup', async function(req, res){
     }
 })
 
-router.post('/login', function(req, res, next){
+router.post('/api/login', function(req, res, next){
     passport.authenticate('local', function(err, user, info){
         if(err){
             return next(err)
@@ -105,7 +105,7 @@ router.get('/verify-email', async function(req, res){
     }
 })
 
-router.post('/resend-verification', async function(req, res){
+router.post('/api/resend-verification', async function(req, res){
     const email = String(req.body.email || '').trim()
 
     try{
@@ -142,7 +142,7 @@ router.get('/auth/google/callback',
 
 /* ---------- session ---------- */
 
-router.post('/logout', function(req, res, next){
+router.post('/api/logout', function(req, res, next){
     req.logout(function(err) {
         if (err) {
             console.log(err)
@@ -159,7 +159,7 @@ router.post('/logout', function(req, res, next){
     });
 });
 
-router.get('/getProfileInfo', isLoggedIn, function(req,res){
+router.get('/api/profile', isLoggedIn, function(req,res){
     addLikesToUser(req.user).then(user_object=>{
         res.json(user_object)
     }).catch(err=>{

@@ -41,7 +41,12 @@ app.use(express.static(clientDir));
 app.use('/',user)
 app.use('/',recipe)
 
-//vue router owns the urls, so anything that is not an api route gets index.html
+//an unknown /api path is a mistake, not a page - never answer it with the html shell
+app.use('/api', function(req, res) {
+  res.status(404).json({ message: 'no such endpoint' });
+});
+
+//vue router owns the rest of the urls, so everything else gets index.html
 app.get('*', function(req, res) {
   res.sendFile(path.join(clientDir, 'index.html'));
 });

@@ -33,7 +33,7 @@ function parseList(value){
   }
 }
 
-router.post('/createRecipe',isLoggedIn,generateRecipeId, upload.single('image'), function (req, res) {
+router.post('/api/recipes',isLoggedIn,generateRecipeId, upload.single('image'), function (req, res) {
   if(!req.body.name){
     return res.status(400).json({message: "a recipe needs a name"})
   }
@@ -59,7 +59,7 @@ router.post('/createRecipe',isLoggedIn,generateRecipeId, upload.single('image'),
 })
 
 
-router.delete('/recipe/:id',isLoggedIn,(req,res)=>{
+router.delete('/api/recipes/:id',isLoggedIn,(req,res)=>{
   const id = parseInt(req.params.id)
   if(Number.isNaN(id)){
     return res.status(400).json({message: "bad recipe id"})
@@ -89,7 +89,7 @@ router.delete('/recipe/:id',isLoggedIn,(req,res)=>{
 
 const COMMENT_MAX = 1000
 
-router.get('/recipe/:id/comments',(req,res)=>{
+router.get('/api/recipes/:id/comments',(req,res)=>{
   const id = parseInt(req.params.id)
   if(Number.isNaN(id)){
     return res.status(400).json({message: "bad recipe id"})
@@ -102,7 +102,7 @@ router.get('/recipe/:id/comments',(req,res)=>{
   })
 })
 
-router.post('/recipe/:id/comments',isLoggedIn,(req,res)=>{
+router.post('/api/recipes/:id/comments',isLoggedIn,(req,res)=>{
   const id = parseInt(req.params.id)
   const body = String(req.body.body || '').trim()
 
@@ -132,7 +132,7 @@ router.post('/recipe/:id/comments',isLoggedIn,(req,res)=>{
   })
 })
 
-router.delete('/comments/:comment_id',isLoggedIn,(req,res)=>{
+router.delete('/api/comments/:comment_id',isLoggedIn,(req,res)=>{
   const id = parseInt(req.params.comment_id)
   if(Number.isNaN(id)){
     return res.status(400).json({message: "bad comment id"})
@@ -151,7 +151,7 @@ router.delete('/comments/:comment_id',isLoggedIn,(req,res)=>{
   })
 })
 
-router.post('/like/:recipe_id',isLoggedIn,(req,res)=>{
+router.post('/api/recipes/:recipe_id/like',isLoggedIn,(req,res)=>{
   handlelike(req.params.recipe_id, req.user.user_id, req.body.like).then((success)=>{
     if(success){
       res.json({action: success})
@@ -169,7 +169,26 @@ router.get('/data/recipes_pics/:filename', (req, res) => {
       }
     });
   });
-router.get('/recipe/:id',(req,res)=>{
+router.get('/api/recipes', (req, res) => {
+
+    getMostLiked().then((data=>{
+      res.json(data)
+    }))
+
+
+  });
+
+//has to stay above /api/recipes/:id, otherwise "mine" is read as an id
+router.get('/api/recipes/mine',isLoggedIn,(req,res)=>{
+    dbMyRecipes(req.user.user_id).then((data)=>{
+      res.json(data)
+    }).catch(err=>{
+      console.log(err)
+      res.status(500).json({message: "could not load your recipes"})
+    })
+})
+
+router.get('/api/recipes/:id',(req,res)=>{
     const id = parseInt(req.params.id)
     if(Number.isNaN(id)){
       return res.status(400).json({message: "bad recipe id"})
@@ -183,25 +202,6 @@ router.get('/recipe/:id',(req,res)=>{
       console.log(err)
       res.status(500).json({message: "could not load the recipe"})
     })
-})
-router.get('/recipes', (req, res) => {
-    
-    getMostLiked().then((data=>{
-      res.json(data)
-    }))
-
-
-  });
-router.get('/myRecipes',isLoggedIn,(req,res)=>{
-  if(req.user){
-    const myId = req.user.user_id
-    dbMyRecipes(myId).then((data)=>{
-      res.json(data)
-    })
-  }else{
-    res.end()
-  }
-    
 })
 
 
