@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import RatingButtons from '../components/RatingButtons.vue'
 import DeleteRecipeButton from '../components/DeleteRecipeButton.vue'
+import CommentSection from '../components/CommentSection.vue'
 import { api } from '../api'
 import { useAuth } from '../composables/useAuth'
 
@@ -95,6 +96,8 @@ watch(() => route.params.id, id => id && fetchRecipe(id))
           <p v-if="!recipe.steps.length" class="muted">No steps written down yet.</p>
         </section>
       </div>
+
+      <CommentSection :recipe-id="recipe.recipe_id" :recipe-owner-id="recipe.user_id" />
     </article>
   </div>
 </template>
