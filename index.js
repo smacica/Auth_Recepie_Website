@@ -3,7 +3,8 @@ const express = require('express');
 var cors = require('cors')
 const session = require('express-session')
 const passport = require('passport')
-const {strategy} = require('./google_strategy')
+const {strategy: googleStrategy} = require('./google_strategy')
+const {strategy: localStrategy} = require('./local_strategy')
 const app = express();
 const {dbFind} = require('./db')
 const {sessionConf} = require('./session_config')
@@ -18,7 +19,8 @@ const clientDir = path.join(__dirname, 'frontend', 'dist')
 //in dev the vue app runs on its own port, in prod it is served from clientDir
 const clientUrl = process.env.CLIENT_URL || ''
 
-passport.use(strategy)
+passport.use(googleStrategy)
+passport.use(localStrategy)
 passport.serializeUser((user, done) => {
   done(null, user.user_id);
 });
