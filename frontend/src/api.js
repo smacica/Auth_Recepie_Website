@@ -64,5 +64,9 @@ export const api = {
   createRecipe: formData => request('/createRecipe', { method: 'POST', body: formData }),
   deleteRecipe: id => request(`/recipe/${id}`, { method: 'DELETE' }),
 
+  getComments: recipeId => request(`/recipe/${recipeId}/comments`),
+  addComment: (recipeId, body) => request(`/recipe/${recipeId}/comments`, asJson({ body })),
+  deleteComment: commentId => request(`/comments/${commentId}`, { method: 'DELETE' }),
+
   rate: (recipeId, like) => request(`/like/${recipeId}`, asJson({ like }))
 }
