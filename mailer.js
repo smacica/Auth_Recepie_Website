@@ -7,36 +7,15 @@ if (!configured) {
   console.warn('SMTP_* are not set, verification links will be printed to this console instead of emailed. See README.md')
 }
 
-const port = Number(process.env.SMTP_PORT || 587)
-
-//465 speaks TLS from the first byte, 587 upgrades with STARTTLS. Hosts that block
-//the standard ports (DigitalOcean does) are reached on 2465 and 2587, which behave
-//like 465 and 587 respectively. SMTP_SECURE overrides the guess if a provider differs.
-const secure = process.env.SMTP_SECURE
-  ? process.env.SMTP_SECURE === 'true'
-  : port === 465 || port === 2465
-
 const transport = configured
   ? nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port,
-      secure,
+      port: Number(process.env.SMTP_PORT || 587),
+      //port 465 speaks TLS from the first byte, 587 upgrades with STARTTLS
+      secure: Number(process.env.SMTP_PORT || 587) === 465,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
     })
   : null
-
-//surfaces a bad host, port or password now instead of when someone first signs up
-async function verifyTransport() {
-  if (!transport) {
-    return { ok: false, reason: 'SMTP is not configured (SMTP_HOST, SMTP_USER, SMTP_PASS)' }
-  }
-  try {
-    await transport.verify()
-    return { ok: true, host: process.env.SMTP_HOST, port, secure }
-  } catch (err) {
-    return { ok: false, reason: err.message }
-  }
-}
 
 function verificationEmail(link) {
   return {
@@ -62,4 +41,4 @@ async function sendVerificationEmail(to, link) {
   return { delivered: true }
 }
 
-module.exports = { sendVerificationEmail, verifyTransport, mailConfigured: configured }
+module.exports = { sendVerificationEmail, mailConfigured: configured }

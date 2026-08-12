@@ -98,61 +98,22 @@ http://localhost:4000/verify-email?token=3a587e65…
 
 Paste that into the browser and the account is confirmed.
 
-**For real delivery**, fill in the SMTP block in `.env`. Two setups worth knowing:
-
-#### Gmail — fine locally, will not work on DigitalOcean
-
-Quickest option on your own machine. Needs 2-Step Verification switched on, because
-that is what unlocks App Passwords.
-
-1. Turn on 2-Step Verification at <https://myaccount.google.com/signinoptions/two-step-verification>.
-2. Create a password at <https://myaccount.google.com/apppasswords>, name it `EatHub`.
-3. Copy the 16 characters (drop the spaces) into `SMTP_PASS`.
+**For real delivery**, fill in the SMTP block in `.env` with any provider:
 
 ```dotenv
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=you@gmail.com
-SMTP_PASS=abcdefghijklmnop        # the app password, never your login password
-MAIL_FROM=EatHub <you@gmail.com>  # gmail rewrites this to the account address anyway
-```
-
-Roughly 500 messages a day, and mail arrives from your personal address.
-
-#### A transactional provider — what production needs
-
-**DigitalOcean blocks outbound SMTP on ports 25, 465 and 587** for Droplets, so
-Gmail's settings will simply time out once deployed. Either open a support ticket,
-or use a provider offering an alternative port. [Resend](https://resend.com) serves
-2465 and 2587 for exactly this, and the free tier is 3,000 messages a month:
-
-```dotenv
-SMTP_HOST=smtp.resend.com
-SMTP_PORT=2587                    # 2465 for implicit TLS. avoids the DO block
-SMTP_USER=resend
-SMTP_PASS=re_your_api_key
+SMTP_HOST=smtp.sendgrid.net      # or smtp.gmail.com, smtp.mailgun.org, …
+SMTP_PORT=587                    # 465 if the provider wants implicit TLS
+SMTP_USER=apikey
+SMTP_PASS=your-smtp-password
 MAIL_FROM=EatHub <no-reply@yourdomain.com>
 PUBLIC_URL=https://eathub.example.com
 ```
 
-Sending from your own domain means verifying it (Resend gives you the DNS records).
-Before that is set up, `onboarding@resend.dev` works as the `MAIL_FROM`, but only
-delivers to the address that owns the Resend account — enough to test the flow.
-
 Set `PUBLIC_URL` in production. The link inside the email has to be absolute, and
 deriving it from the request headers gets it wrong when you sit behind a proxy.
 
-#### Checking it works
-
-```bash
-npm run mail:test                      # connect and authenticate only
-npm run mail:test -- you@example.com   # send a real message
-```
-
-It prints the settings it is using, then says whether the connection, the login and
-the send each succeeded. A timeout almost always means the port is blocked — try
-2587. An auth failure on Gmail almost always means a login password was used where
-an App Password was needed.
+> With Gmail, `SMTP_PASS` must be an [App Password](https://myaccount.google.com/apppasswords),
+> not your account password.
 
 How the flow behaves:
 
