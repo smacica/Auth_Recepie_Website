@@ -30,6 +30,7 @@ const signOut = async () => {
         <RouterLink to="/">Recipes</RouterLink>
         <RouterLink v-if="isLoggedIn" to="/my-recipes">My kitchen</RouterLink>
         <RouterLink v-if="isLoggedIn" to="/new">Add recipe</RouterLink>
+        <RouterLink v-if="isLoggedIn" to="/generate" class="nav__ai">✨ AI recipe</RouterLink>
 
         <template v-if="isLoggedIn">
           <RouterLink to="/profile" class="nav__me">
@@ -98,6 +99,11 @@ const signOut = async () => {
   text-decoration: underline;
   text-underline-offset: 6px;
   text-decoration-thickness: 2px;
+}
+
+.nav__ai {
+  color: var(--paprika-dark);
+  font-weight: 600;
 }
 
 .nav__me {

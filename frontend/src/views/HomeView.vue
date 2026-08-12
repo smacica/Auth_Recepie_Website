@@ -47,7 +47,8 @@ onMounted(async () => {
           <div class="hero__actions">
             <RouterLink v-if="isLoggedIn" to="/new" class="btn">Add your recipe</RouterLink>
             <RouterLink v-else to="/signin" class="btn">Sign in to cook along</RouterLink>
-            <a href="#browse" class="btn btn--ghost">Browse the pot</a>
+            <RouterLink v-if="isLoggedIn" to="/generate" class="btn btn--ghost">✨ Generate one</RouterLink>
+            <a v-else href="#browse" class="btn btn--ghost">Browse the pot</a>
           </div>
         </div>
         <div class="hero__plate" aria-hidden="true">

@@ -77,7 +77,10 @@ const submit = async () => {
   <div class="page create">
     <p class="eyebrow">New recipe</p>
     <h1>What are we cooking?</h1>
-    <p class="muted create__lead">Keep it short. Ingredients, steps, done.</p>
+    <p class="muted create__lead">
+      Keep it short. Ingredients, steps, done. Or
+      <RouterLink to="/generate">let the AI write one</RouterLink>.
+    </p>
 
     <form class="create__form" @submit.prevent="submit">
       <div class="panel stack">
