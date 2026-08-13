@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import CookingLoader from '../components/CookingLoader.vue'
 import { api } from '../api'
 
 const router = useRouter()
@@ -59,7 +60,12 @@ onMounted(loadQuota)
       AI generation is not set up on this server yet.
     </div>
 
-    <form class="gen__form" @submit.prevent="generate">
+    <!-- the form is replaced while it works, so nothing can be edited or resubmitted -->
+    <div v-if="busy" class="panel">
+      <CookingLoader />
+    </div>
+
+    <form v-else class="gen__form" @submit.prevent="generate">
       <div class="panel stack">
         <div>
           <label for="ing">What have you got?</label>
@@ -92,8 +98,8 @@ onMounted(loadQuota)
       <p v-if="error" class="notice notice--error gen__msg">{{ error }}</p>
 
       <div class="gen__actions">
-        <button type="submit" class="btn" :disabled="busy || !canSubmit || outOfQuota || unavailable">
-          {{ busy ? 'Cooking it up…' : '✨ Generate recipe' }}
+        <button type="submit" class="btn" :disabled="!canSubmit || outOfQuota || unavailable">
+          ✨ Generate recipe
         </button>
         <RouterLink to="/new" class="btn btn--ghost">Write one myself</RouterLink>
 
@@ -103,8 +109,6 @@ onMounted(loadQuota)
         </span>
       </div>
     </form>
-
-    <p v-if="busy" class="muted gen__waiting">The model is writing — this takes a few seconds.</p>
   </div>
 </template>
 
@@ -149,10 +153,5 @@ onMounted(loadQuota)
 
 .gen__quota {
   font-size: 0.86rem;
-}
-
-.gen__waiting {
-  margin-top: 16px;
-  font-size: 0.9rem;
 }
 </style>
