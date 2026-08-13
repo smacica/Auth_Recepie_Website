@@ -29,10 +29,22 @@ const preview = ref(null)
 const error = ref('')
 const saving = ref(false)
 
-const addRow = (list, blank = '') => list.value.push(blank)
-const removeRow = (list, index, blank = '') => {
-  list.value.splice(index, 1)
-  if (!list.value.length) list.value.push(blank)
+// these close over the refs on purpose. passing `ingredients` from the template
+// handed over the plain array, because script setup unwraps refs in templates,
+// so the old shared helper was reaching for .value on an array and throwing.
+const addIngredient = () => ingredients.value.push(emptyIngredient())
+
+const removeIngredient = index => {
+  ingredients.value.splice(index, 1)
+  //always leave one row, otherwise there is nothing left to type into
+  if (!ingredients.value.length) ingredients.value.push(emptyIngredient())
+}
+
+const addStep = () => steps.value.push('')
+
+const removeStep = index => {
+  steps.value.splice(index, 1)
+  if (!steps.value.length) steps.value.push('')
 }
 
 const onFile = event => {
@@ -112,16 +124,11 @@ const submit = async () => {
             placeholder="200 g spaghetti"
             @input="onIngredientText(index)"
           />
-          <button
-            type="button"
-            class="create__remove"
-            title="Remove"
-            @click="removeRow(ingredients, index, emptyIngredient())"
-          >
+          <button type="button" class="create__remove" title="Remove" @click="removeIngredient(index)">
             ✕
           </button>
         </div>
-        <button type="button" class="btn btn--ghost btn--sm" @click="addRow(ingredients, emptyIngredient())">
+        <button type="button" class="btn btn--ghost btn--sm" @click="addIngredient">
           + Ingredient
         </button>
       </div>
@@ -131,9 +138,9 @@ const submit = async () => {
         <div v-for="(step, index) in steps" :key="`step-${index}`" class="create__row">
           <span class="create__no">{{ index + 1 }}</span>
           <textarea v-model="steps[index]" placeholder="Boil the water, salt it like the sea." />
-          <button type="button" class="create__remove" title="Remove" @click="removeRow(steps, index)">✕</button>
+          <button type="button" class="create__remove" title="Remove" @click="removeStep(index)">✕</button>
         </div>
-        <button type="button" class="btn btn--ghost btn--sm" @click="addRow(steps)">+ Step</button>
+        <button type="button" class="btn btn--ghost btn--sm" @click="addStep">+ Step</button>
       </div>
 
       <p v-if="error" class="notice notice--error">{{ error }}</p>
