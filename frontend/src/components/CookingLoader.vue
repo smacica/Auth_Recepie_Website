@@ -32,8 +32,11 @@ onBeforeUnmount(() => clearInterval(timer))
       <span class="cook__steam cook__steam--c"></span>
 
       <div class="cook__pot">
-        <div class="cook__bubbles">
-          <span></span><span></span><span></span>
+        <!-- only the inside clips, so the handles hanging off the sides survive -->
+        <div class="cook__pot-inner">
+          <div class="cook__bubbles">
+            <span></span><span></span><span></span>
+          </div>
         </div>
       </div>
       <div class="cook__hob"></div>
@@ -72,6 +75,12 @@ onBeforeUnmount(() => clearInterval(timer))
   border-radius: 0 0 22px 22px;
   background: linear-gradient(180deg, #5d4a3d, #3b2c22);
   box-shadow: inset 0 5px 0 rgba(255, 255, 255, 0.12);
+}
+
+.cook__pot-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: 0 0 22px 22px;
   overflow: hidden;
 }
 
