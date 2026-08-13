@@ -16,7 +16,9 @@ const visible = computed(() => {
   if (!term) return recipes.value
 
   return recipes.value.filter(recipe =>
-    [recipe.name, recipe.info, ...recipe.ingredients]
+    // ingredients are {emoji, text}, so pull the text out - stringifying the whole
+    // object turned every one of them into "[object Object]" and matched nothing
+    [recipe.name, recipe.info, ...recipe.ingredients.map(item => item.text)]
       .filter(Boolean)
       .some(field => String(field).toLowerCase().includes(term))
   )
