@@ -1,4 +1,5 @@
 const { normaliseIngredients } = require('./shared/ingredients.mjs')
+const { logger } = require('./logger')
 
 //Interactions API - the older generateContent shape is retired.
 //https://ai.google.dev/gemini-api/docs/interactions/text-generation
@@ -10,7 +11,7 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash'
 const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS || 30000)
 
 if (!process.env.GEMINI_API_KEY) {
-  console.warn('GEMINI_API_KEY is missing, AI recipe generation is switched off. See README.md')
+  logger.warn('GEMINI_API_KEY is missing, AI recipe generation is switched off. See README.md')
 }
 
 const isConfigured = () => Boolean(process.env.GEMINI_API_KEY)
@@ -146,14 +147,14 @@ async function generateRecipe({ ingredients, description }) {
     })
   } catch (err) {
     clearTimeout(timer)
-    console.log('gemini request failed:', err.name === 'AbortError' ? 'timed out' : err.message)
+    logger.error({ err }, 'gemini request failed')
     return { ok: false, reason: err.name === 'AbortError' ? 'timeout' : 'unreachable' }
   }
   clearTimeout(timer)
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    console.log(`gemini responded ${response.status}: ${body.slice(0, 400)}`)
+    logger.error({ status: response.status, body: body.slice(0, 400) }, 'gemini returned an error status')
     //429 means the free quota is gone regardless of what our own counters think
     return { ok: false, reason: response.status === 429 ? 'rate-limited' : 'upstream', status: response.status }
   }
@@ -161,7 +162,7 @@ async function generateRecipe({ ingredients, description }) {
   const payload = await response.json().catch(() => null)
   const text = readOutputText(payload)
   if (!text) {
-    console.log('gemini returned no text')
+    logger.error('gemini returned no text')
     return { ok: false, reason: 'unreadable' }
   }
 
@@ -169,7 +170,7 @@ async function generateRecipe({ ingredients, description }) {
   try {
     parsed = JSON.parse(text)
   } catch {
-    console.log('gemini returned text that is not json:', text.slice(0, 200))
+    logger.error({ text: text.slice(0, 200) }, 'gemini returned text that is not json')
     return { ok: false, reason: 'unreadable' }
   }
 

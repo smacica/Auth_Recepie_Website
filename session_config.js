@@ -1,6 +1,7 @@
 const uuid = require('uuid').v4
 var session = require('express-session');
 const Store = require('express-sqlite3')(session);
+const { logger } = require('./logger')
 
 const storeOptions = {
   db: './data/main.db',
@@ -8,7 +9,7 @@ const storeOptions = {
 };
 
 if (!process.env.SESSION_SECRET) {
-  console.warn('SESSION_SECRET is missing, falling back to a development value. See README.md')
+  logger.warn('SESSION_SECRET is missing, falling back to a development value. See README.md')
 }
 
 sessionConf = {

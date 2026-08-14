@@ -1,10 +1,11 @@
 const nodemailer = require('nodemailer')
+const { logger } = require('./logger')
 
 const from = process.env.MAIL_FROM || 'EatHub <no-reply@eathub.local>'
 const configured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
 
 if (!configured) {
-  console.warn('SMTP_* are not set, verification links will be printed to this console instead of emailed. See README.md')
+  logger.warn('SMTP_* are not set, verification links will be printed to this console instead of emailed. See README.md')
 }
 
 const transport = configured
@@ -33,6 +34,8 @@ async function sendVerificationEmail(to, link) {
 
   //without smtp credentials there is nowhere to send, so make the link usable anyway
   if (!transport) {
+    //deliberately console.log and not the logger: this is the dev fallback for a
+    //missing smtp setup and has to stay readable and unfilterable
     console.log(`\n--- verification link for ${to} ---\n${link}\n---\n`)
     return { delivered: false }
   }
