@@ -169,19 +169,15 @@ planning. The leak checks pass: a request to
 log output containing neither value, and `/assets/app.js` produced no line at
 all. Three corrections came out of that exercise.
 
-**1. `reqId` needs wiring in two places.** The flat request line is achieved by
-returning `undefined` from the `req` and `res` serializers and building the
-fields in `customProps`. That also discards pino-http's request id, which
-normally rides inside the serialized `req`. It has to be restored explicitly:
-`reqId: req.id` inside `customProps` for the request line, **and** a one-line
-middleware directly after the logger for everything else:
-
-```js
-app.use((req, res, next) => { req.log = req.log.child({ reqId: req.id }); next() })
-```
-
-Without the second, `req.log.error(...)` inside a route logs no `reqId` and
-correlation silently fails.
+**1. `reqId` binds itself once both quiet-logger options are set.** The flat
+request line is achieved by returning `undefined` from the `req` and `res`
+serializers and building the fields in `customProps`. Setting both
+`quietReqLogger` and `quietResLogger` makes pino-http bind `reqId` itself
+(`logger.child({ reqId: req.id })`) onto a single child logger, before
+`customProps` ever runs, and that same child logger backs both `req.log`
+inside route handlers and the request-completion line. `reqId` must **not**
+be added again inside `customProps` — that would write the field twice on the
+wire — and no extra middleware is needed to attach it.
 
 **2. `userId` is `null` on `req.log.*` lines.** pino-http evaluates
 `customProps` once when it creates the child logger, which happens before

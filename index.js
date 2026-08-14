@@ -34,7 +34,9 @@ passport.deserializeUser((id, done) => {
     done(err)
   })});
 
-//app platform terminates tls in front of us, so req.ip is the proxy without this
+//app platform terminates tls in front of us, so req.ip is the proxy without this.
+//it also makes req.secure/req.protocol reflect the original scheme, which is what
+//lets session_config set the production cookie and makes emailed verification links https
 app.set('trust proxy', 1)
 
 //middleware
