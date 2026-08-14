@@ -6,10 +6,12 @@ const path = require('node:path')
 const root = path.join(__dirname, '..')
 const SKIP_DIRS = new Set(['node_modules', 'frontend', '.git', 'data', 'test', '.idea', '.vscode'])
 
-//the verification-link fallback is deliberate developer output: it has to stay
-//readable and must not be filtered out by LOG_LEVEL. only that specific line is
-//exempt, not the whole file, since mailer.js also handles email addresses
+//the verification-link fallback in mailer.js is deliberate developer output:
+//it has to stay readable and must not be filtered out by LOG_LEVEL. only that
+//specific line in mailer.js is exempt, not the whole file, since mailer.js also
+//handles email addresses. exemption requires both file name and content check.
 const ALLOWED_CONTENT = 'verification link for'
+const ALLOWED_FILE = 'mailer.js'
 
 function backendFiles(dir = root, found = []){
   for(const entry of fs.readdirSync(dir, { withFileTypes: true })){
@@ -29,7 +31,7 @@ test('backend code logs through the logger, not console', () => {
     const relative = path.relative(root, file)
 
     fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
-      if(/console\.\w+\(/.test(line) && !line.includes(ALLOWED_CONTENT)){
+      if(/console\.\w+\(/.test(line) && !(file.endsWith(ALLOWED_FILE) && line.includes(ALLOWED_CONTENT))){
         offenders.push(`${relative}:${index + 1}`)
       }
     })
