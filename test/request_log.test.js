@@ -9,9 +9,14 @@ const { pathOf, isStatic } = require('../request_log')
 //rather than on a mock of it
 function makeApp(){
   const lines = []
+  //raw, unparsed chunks: JSON.parse collapses duplicate keys (last wins), so
+  //a test for double-written fields has to look at the wire bytes, not this
+  const rawLines = []
   const sink = new Writable({
     write(chunk, encoding, callback){
-      lines.push(JSON.parse(chunk.toString()))
+      const raw = chunk.toString()
+      rawLines.push(raw)
+      lines.push(JSON.parse(raw))
       callback()
     }
   })
@@ -35,8 +40,10 @@ function makeApp(){
   })
   app.get('/api/missing', (req, res) => res.status(404).json({}))
   app.get('/api/fine', (req, res) => res.json({}))
+  //a parameterized route whose :id can end in a static-looking extension
+  app.get('/api/recipes/:id', (req, res) => res.json({}))
 
-  return { app, lines }
+  return { app, lines, rawLines }
 }
 
 //makes one request against an ephemeral port and resolves once the line is written
@@ -133,4 +140,64 @@ test('the request line carries no fabricated error on a 500', async () => {
 
   assert.strictEqual(requestLine.err, undefined)
   assert.strictEqual(typeof requestLine.durationMs, 'number')
+})
+
+test('writes each field exactly once on the wire, even when userId and status change mid-request', async () => {
+  const app = makeApp()
+  //hits both the in-handler line (written through req.log, via attachReqId)
+  //and the finish line (written through customProps at response time), since
+  //the double-write bug could hide in either one
+  await request(app, '/api/boom')
+
+  //JSON.parse would silently collapse a duplicated key (last value wins), which
+  //is exactly why this has to inspect the raw bytes pino wrote rather than the
+  //already-parsed `lines` array
+  assert.ok(app.rawLines.length >= 2, 'expected both a handler line and a request line')
+
+  for(const raw of app.rawLines){
+    const keys = Array.from(raw.matchAll(/"(\w+)":/g), match => match[1])
+    const counts = {}
+    for(const key of keys){
+      counts[key] = (counts[key] || 0) + 1
+    }
+    const duplicated = Object.entries(counts).filter(([, count]) => count > 1)
+    assert.deepStrictEqual(duplicated, [], `field(s) written more than once in ${raw}: ${JSON.stringify(duplicated)}`)
+  }
+})
+
+test('logs a parameterized api path even when it ends like a static asset', async () => {
+  const hit = await request(makeApp(), '/api/recipes/42.css')
+  const line = hit.find(entry => entry.msg === 'request')
+  assert.ok(line, 'the request line for /api/recipes/42.css was suppressed')
+  assert.strictEqual(line.path, '/api/recipes/42.css')
+
+  //a genuine static asset must still be skipped
+  const bundle = await request(makeApp(), '/assets/app.js')
+  assert.strictEqual(bundle.length, 0)
+})
+
+test('replaces a forged x-request-id but honours a well-formed one', async () => {
+  const honoured = await request(makeApp(), '/api/fine', { 'x-request-id': 'upstream-abc.123_XYZ' })
+  assert.strictEqual(
+    honoured.find(entry => entry.msg === 'request').reqId,
+    'upstream-abc.123_XYZ'
+  )
+
+  const tooLong = 'a'.repeat(250)
+  const overLong = await request(makeApp(), '/api/fine', { 'x-request-id': tooLong })
+  const overLongId = overLong.find(entry => entry.msg === 'request').reqId
+  assert.notStrictEqual(overLongId, tooLong, 'an oversized header was logged verbatim')
+
+  const illegal = await request(makeApp(), '/api/fine', { 'x-request-id': 'has spaces/slashes;here' })
+  const illegalId = illegal.find(entry => entry.msg === 'request').reqId
+  assert.notStrictEqual(illegalId, 'has spaces/slashes;here', 'a header with illegal characters was logged verbatim')
+})
+
+test('attachReqId tolerates a request with no req.log', () => {
+  const { buildRequestLog } = require('../request_log')
+  const { attachReqId } = buildRequestLog()
+
+  let called = false
+  assert.doesNotThrow(() => attachReqId({}, {}, () => { called = true }))
+  assert.ok(called, 'next() was not called when req.log was missing')
 })

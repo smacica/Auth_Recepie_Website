@@ -8,6 +8,17 @@ const { logger, options } = require('./logger')
 const STATIC_PREFIXES = ['/assets/', '/ai_pics/']
 const STATIC_FILE = /\.(js|mjs|css|map|png|jpe?g|webp|svg|gif|ico|woff2?|ttf)$/i
 
+//a param on a route like /api/recipes/:id can end in one of the STATIC_FILE
+//extensions (e.g. /api/recipes/42.css), which would otherwise match the
+//extension test below and vanish from the audit trail. api paths are never
+//static, no matter what they end in.
+const API_PREFIX = '/api/'
+
+//a well-formed id: short and free of anything that could blow past node's
+//header size cap or get interpreted downstream. anything else is treated as
+//untrusted client input and replaced.
+const REQUEST_ID = /^[A-Za-z0-9._-]{1,200}$/
+
 //originalUrl carries the query string, and /verify-email?token=... is a working
 //credential until it is used. only ever keep what comes before the '?'.
 function pathOf(req){
@@ -15,7 +26,8 @@ function pathOf(req){
 }
 
 function isStatic(path){
-  return STATIC_PREFIXES.some(prefix => path.startsWith(prefix)) || STATIC_FILE.test(path)
+  return STATIC_PREFIXES.some(prefix => path.startsWith(prefix)) ||
+    (!path.startsWith(API_PREFIX) && STATIC_FILE.test(path))
 }
 
 //the destination argument only exists so the tests can capture output. it has to
@@ -29,9 +41,24 @@ function buildRequestLog(destination){
 
     genReqId(req){
       //reuse the platform's id when there is one, so a log line can be matched
-      //against the proxy's own record of the request
-      return req.headers['x-request-id'] || crypto.randomUUID()
+      //against the proxy's own record of the request. a client-forged header is
+      //never trusted verbatim: it could collide ids across requests to poison
+      //correlation, or run toward node's ~16KB header cap.
+      const incoming = req.headers['x-request-id']
+      return incoming && REQUEST_ID.test(incoming) ? incoming : crypto.randomUUID()
     },
+
+    //quiets both the request-side and response-side child loggers pino-http
+    //binds at request entry, so customProps binds exactly once, at finish.
+    //quietReqLogger alone is not enough: pino-http still uses the entry-bound
+    //fullReqLogger as res.log unless quietResLogger is also set, and that is
+    //the logger the final "request" line is written through. without both,
+    //every field is written twice on the wire (once at entry with stale
+    //values, once at finish) because pino-http's own dedup guard only fires
+    //when both binding sets are byte-identical, which they never are once
+    //userId or status changes.
+    quietReqLogger: true,
+    quietResLogger: true,
 
     //returning undefined keeps the raw req and res out of the log entirely.
     //this is what makes the field list an allowlist rather than a denylist:
@@ -42,15 +69,16 @@ function buildRequestLog(destination){
 
     customProps(req, res){
       return {
-        //suppressing the req serializer also discarded pino-http's request id,
-        //so it has to be put back by hand
-        reqId: req.id,
+        //reqId is not listed here: quietReqLogger/quietResLogger make pino-http
+        //bind it itself (logger.child({ reqId: req.id })) before customProps
+        //ever runs, so adding it again would write the field twice on the wire
         method: req.method,
         path: pathOf(req),
         status: res.statusCode,
-        //null on lines logged through req.log: pino-http evaluates this once when
-        //it builds the child logger, which is before passport sets req.user. the
-        //request line below is re-evaluated at finish and does carry the id.
+        //req.user is set by passport, which runs after this middleware, so it is
+        //only ever readable here at finish (customProps is evaluated once per
+        //line thanks to quietReqLogger above). lines logged through req.log
+        //during the handler carry only reqId, not this field at all.
         userId: req.user ? req.user.user_id : null,
         ip: req.ip || null,
         ua: req.headers['user-agent'] || null
@@ -81,11 +109,16 @@ function buildRequestLog(destination){
     }
   })
 
-  //req.log is a child built before passport runs, and it lost its request id along
-  //with the req serializer. rebinding it here is what makes an in-route error
-  //greppable against the request that caused it.
+  //quietReqLogger above already makes pino-http bind reqId onto req.log itself
+  //(logger.child({ reqId: req.id }), built before passport runs), so this no
+  //longer needs to rebind it by hand - doing so a second time would write the
+  //field twice on every line logged through req.log, e.g. an in-route error.
+  //what's left is a defensive guard: a misconfigured mount (requestLog not run
+  //first) must not turn every request into a 500.
   function attachReqId(req, res, next){
-    req.log = req.log.child({ reqId: req.id })
+    if(!req.log){
+      return next()
+    }
     next()
   }
 
