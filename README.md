@@ -274,7 +274,7 @@ npm run dev
 Each completed request logs one line:
 
 ```json
-{"level":30,"time":1755100000000,"env":"production","reqId":"…","method":"GET",
+{"level":30,"time":1755100000000,"env":"production","pid":30213,"reqId":"…","method":"GET",
  "path":"/api/recipes/42","status":200,"durationMs":14,"userId":7,
  "ip":"203.0.113.9","ua":"Mozilla/5.0 …","msg":"request"}
 ```
@@ -283,10 +283,11 @@ Each completed request logs one line:
 everything that went wrong. Requests for the built frontend bundle and the AI
 artwork are not logged.
 
-**Bodies, headers and query strings are never logged.** Passwords arrive in
-request bodies, the email verification token arrives in a query string, and the
-session cookie arrives in a header — none of them can reach the log, because the
-serializer names the fields it keeps rather than the ones it drops.
+**Bodies and query strings are never logged, and of all the request headers only
+`User-Agent` is.** The serializer names the handful of fields it keeps rather
+than the ones it drops, so no body, no query-string value, and no header beyond
+that one allowlisted `User-Agent` can reach a log line — which is what keeps
+passwords, the `/verify-email` token and the `connect.sid` cookie out.
 
 Errors logged inside a route share their `reqId` with the request line, so
 grepping one id gives the request and everything that happened during it. Those

@@ -14,7 +14,7 @@ function backendFiles(dir = root, found = []){
   for(const entry of fs.readdirSync(dir, { withFileTypes: true })){
     if(entry.isDirectory()){
       if(!SKIP_DIRS.has(entry.name)) backendFiles(path.join(dir, entry.name), found)
-    }else if(entry.name.endsWith('.js')){
+    }else if(entry.name.endsWith('.js') || entry.name.endsWith('.mjs')){
       found.push(path.join(dir, entry.name))
     }
   }
@@ -29,7 +29,7 @@ test('backend code logs through the logger, not console', () => {
     if(ALLOWED.has(relative)) continue
 
     fs.readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
-      if(/console\.(log|error|warn|info|debug)\(/.test(line)){
+      if(/console\.\w+\(/.test(line)){
         offenders.push(`${relative}:${index + 1}`)
       }
     })
