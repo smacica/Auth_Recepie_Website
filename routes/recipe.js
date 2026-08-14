@@ -15,7 +15,7 @@ const picsDir = path.join(__dirname, '..', 'data', 'recipes_pics')
 
 //artwork that generated recipes get as their photo. vite copies this folder into
 //the build, so the same /ai_pics/... url works in dev and in production.
-const aiPicsDir = path.join(__dirname, '..', 'frontend', 'public', 'ai_pics')
+const aiPicsDir = path.join(__dirname, '..', '..', 'frontend', 'public', 'ai_pics')
 let aiPics = []
 try{
   aiPics = fs.readdirSync(aiPicsDir).filter(name => /\.(jpe?g|png|webp)$/i.test(name))

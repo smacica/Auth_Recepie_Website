@@ -4,10 +4,14 @@ Recipe sharing site. Express + SQLite API, Vue 3 frontend. Sign in with Google o
 with an email address confirmed by a verification link.
 
 ```
-.                     express api (routes/, db.js, gemini.js, ai_quota.js)
-├── shared/           code both sides import (ingredient emoji rules)
-└── frontend/         vue 3 + vite app, builds into frontend/dist
+claude_scan/
+├── Auth_Recepie_Website/   express api (routes/, db.js, gemini.js, ai_quota.js)
+│   └── shared/             code both sides import (ingredient emoji rules)
+└── frontend/               vue 3 + vite app, builds into frontend/dist
 ```
+
+The frontend is a sibling folder, not a subfolder. The Express side expects to find
+it at `../frontend` relative to this project root.
 
 `shared/ingredients.mjs` is written as ESM and used by both: Vite imports it through
 the `@shared` alias, and the Express side reaches it with `require()`, which Node
@@ -77,9 +81,9 @@ a recipe missing a title, ingredients or steps is rejected as `incomplete` rathe
 than saved half-built. Lists are capped at 20 ingredients and 15 steps, and any
 ingredient the model forgot an emoji for gets one guessed from its name.
 
-Generated recipes get a random illustration from `frontend/public/ai_pics`. Those
-are committed to the repo already compressed to 1024×768 (4:3), matching the ratio
-the cards and detail page use.
+Generated recipes get a random illustration from `../frontend/public/ai_pics`. Those
+are stored already compressed to 1024×768 (4:3), matching the ratio the cards and
+detail page use.
 
 ---
 
@@ -235,7 +239,7 @@ npm run dev                       # api on http://localhost:4000
 ```
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev                       # ui on http://localhost:5173
 ```
@@ -247,7 +251,7 @@ Vite server after signing in. Vite proxies the API routes through to port 4000.
 
 ```bash
 npm install
-npm run build                     # builds frontend/dist
+npm run build                     # builds ../frontend/dist
 npm start                         # serves the api and the built ui on :4000
 ```
 

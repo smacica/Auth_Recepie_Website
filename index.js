@@ -14,8 +14,8 @@ const path = require('path');
 const user = require('./routes/user')
 const recipe = require('./routes/recipe')
 
-//vite writes the vue app here, `npm run build` inside frontend/
-const clientDir = path.join(__dirname, 'frontend', 'dist')
+//vite writes the vue app here, `npm run build` inside ../frontend/
+const clientDir = path.join(__dirname, '..', 'frontend', 'dist')
 //in dev the vue app runs on its own port, in prod it is served from clientDir
 const clientUrl = process.env.CLIENT_URL || ''
 
