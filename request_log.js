@@ -109,22 +109,9 @@ function buildRequestLog(destination){
     }
   })
 
-  //quietReqLogger above already makes pino-http bind reqId onto req.log itself
-  //(logger.child({ reqId: req.id }), built before passport runs), so this no
-  //longer needs to rebind it by hand - doing so a second time would write the
-  //field twice on every line logged through req.log, e.g. an in-route error.
-  //what's left is a defensive guard: a misconfigured mount (requestLog not run
-  //first) must not turn every request into a 500.
-  function attachReqId(req, res, next){
-    if(!req.log){
-      return next()
-    }
-    next()
-  }
-
-  return { requestLog, attachReqId }
+  return { requestLog }
 }
 
-const { requestLog, attachReqId } = buildRequestLog()
+const { requestLog } = buildRequestLog()
 
-module.exports = { requestLog, attachReqId, buildRequestLog, pathOf, isStatic }
+module.exports = { requestLog, buildRequestLog, pathOf, isStatic }

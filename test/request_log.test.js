@@ -22,12 +22,11 @@ function makeApp(){
   })
 
   const { buildRequestLog } = require('../request_log')
-  const { requestLog, attachReqId } = buildRequestLog(sink)
+  const { requestLog } = buildRequestLog(sink)
 
   const app = express()
   app.set('trust proxy', 1)
   app.use(requestLog)
-  app.use(attachReqId)
   //stands in for passport, which also runs after the logger
   app.use((req, res, next) => { req.user = { user_id: 7 }; next() })
 
@@ -144,7 +143,7 @@ test('the request line carries no fabricated error on a 500', async () => {
 
 test('writes each field exactly once on the wire, even when userId and status change mid-request', async () => {
   const app = makeApp()
-  //hits both the in-handler line (written through req.log, via attachReqId)
+  //hits both the in-handler line (written through req.log)
   //and the finish line (written through customProps at response time), since
   //the double-write bug could hide in either one
   await request(app, '/api/boom')
@@ -191,13 +190,4 @@ test('replaces a forged x-request-id but honours a well-formed one', async () =>
   const illegal = await request(makeApp(), '/api/fine', { 'x-request-id': 'has spaces/slashes;here' })
   const illegalId = illegal.find(entry => entry.msg === 'request').reqId
   assert.notStrictEqual(illegalId, 'has spaces/slashes;here', 'a header with illegal characters was logged verbatim')
-})
-
-test('attachReqId tolerates a request with no req.log', () => {
-  const { buildRequestLog } = require('../request_log')
-  const { attachReqId } = buildRequestLog()
-
-  let called = false
-  assert.doesNotThrow(() => attachReqId({}, {}, () => { called = true }))
-  assert.ok(called, 'next() was not called when req.log was missing')
 })
