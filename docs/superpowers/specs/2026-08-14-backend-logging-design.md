@@ -158,12 +158,62 @@ worthless in production. The setting has no effect in development.
 one, otherwise `crypto.randomUUID()`. `pino-http`'s default is a per-process
 counter, which restarts at 1 on every deploy and collides across instances.
 
+`reqId` is **not** free once the `req` serializer is suppressed — see
+[Validated behaviour](#validated-behaviour-pino-http-1100).
+
+## Validated behaviour (pino-http 11.0.0)
+
+The design was run against pino 10.3.1 / pino-http 11.0.0 / express 4 before
+planning. The leak checks pass: a request to
+`/verify-email?token=SUPERSECRET123` carrying a `connect.sid` cookie produced
+log output containing neither value, and `/assets/app.js` produced no line at
+all. Three corrections came out of that exercise.
+
+**1. `reqId` needs wiring in two places.** The flat request line is achieved by
+returning `undefined` from the `req` and `res` serializers and building the
+fields in `customProps`. That also discards pino-http's request id, which
+normally rides inside the serialized `req`. It has to be restored explicitly:
+`reqId: req.id` inside `customProps` for the request line, **and** a one-line
+middleware directly after the logger for everything else:
+
+```js
+app.use((req, res, next) => { req.log = req.log.child({ reqId: req.id }); next() })
+```
+
+Without the second, `req.log.error(...)` inside a route logs no `reqId` and
+correlation silently fails.
+
+**2. `userId` is `null` on `req.log.*` lines.** pino-http evaluates
+`customProps` once when it creates the child logger, which happens before
+passport populates `req.user`. The request-completion line re-evaluates them
+and does carry the real `userId`. So an in-route error line shows
+`userId: null`, and the user is found by matching its `reqId` to the request
+line. This is why `reqId` is load-bearing rather than a nicety.
+
+**3. pino-http fabricates an error on every 5xx.** For any response with status
+≥ 500 it logs `new Error('failed with status code 500')` whose stack points
+into `pino-http/logger.js` — misleading noise next to the real error. It is
+suppressed with:
+
+```js
+customErrorObject: (req, res, error, val) => ({ durationMs: val.durationMs })
+```
+
+This also keeps the request line metadata-only, consistent with the rest of the
+design; the genuine error is logged separately by the error middleware under
+the same `reqId`. Suppressing it also restores `durationMs`, which pino-http
+otherwise omits from the error branch.
+
+**Note on `ip`:** values arrive IPv6-mapped (`::ffff:127.0.0.1` locally). This
+is left as-is rather than normalised, since the raw value is what the proxy
+reports.
+
 ## Audit events
 
 | Event | Fields | Purpose |
 | --- | --- | --- |
 | `sign_in` | `userId`, `method` (google/local) | Who got in, and how |
-| `sign_in_failed` | `ip`, `reason` (bad_password/unverified) | Brute-force signal |
+| `sign_in_failed` | `ip`, `reason` (bad_password/unverified/google) | Brute-force signal |
 | `sign_up` | `userId` | New account created |
 | `email_verified` | `userId` | Token actually consumed |
 | `logout` | `userId` | Closes the session pair |
