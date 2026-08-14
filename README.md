@@ -257,6 +257,50 @@ npm start                         # serves the api and the built ui on :4000
 
 ---
 
+## Logging
+
+The backend writes newline-delimited JSON to stdout. Nothing is written to disk,
+because the App Platform filesystem is ephemeral — DigitalOcean captures stdout
+into the runtime log console.
+
+In development the `dev` script pipes through `pino-pretty` for readable output:
+
+```bash
+npm run dev
+```
+
+`npm start` leaves the output as raw JSON, which is what you want in production.
+
+Each completed request logs one line:
+
+```json
+{"level":30,"time":1755100000000,"env":"production","reqId":"…","method":"GET",
+ "path":"/api/recipes/42","status":200,"durationMs":14,"userId":7,
+ "ip":"203.0.113.9","ua":"Mozilla/5.0 …","msg":"request"}
+```
+
+2xx and 3xx log at `info`, 4xx at `warn`, 5xx at `error`, so `level>=40` finds
+everything that went wrong. Requests for the built frontend bundle and the AI
+artwork are not logged.
+
+**Bodies, headers and query strings are never logged.** Passwords arrive in
+request bodies, the email verification token arrives in a query string, and the
+session cookie arrives in a header — none of them can reach the log, because the
+serializer names the fields it keeps rather than the ones it drops.
+
+Errors logged inside a route share their `reqId` with the request line, so
+grepping one id gives the request and everything that happened during it. Those
+in-route lines carry only `reqId`, with no `userId` field at all; the request
+line is the one that carries the user id.
+
+Security-relevant actions log an `event` field: `sign_in`, `sign_in_failed`,
+`sign_up`, `email_verified`, `logout`, `recipe_created`, `recipe_deleted`,
+`delete_denied`, `ai_generated`, `ai_quota_denied`, `ai_rejected`. The AI three
+are worth watching — they show when the Gemini free-tier guard is being hit.
+
+Set `LOG_LEVEL` to change verbosity. It defaults to `info` in production and
+`debug` elsewhere.
+
 ## Auth notes
 
 - Two ways in: Google, or an email address plus a password of at least 8 characters
