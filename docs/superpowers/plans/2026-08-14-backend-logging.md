@@ -16,7 +16,7 @@
 - **Metadata only.** Never log request bodies, response bodies, headers, or query-string values. Passwords arrive in bodies on `/api/signup` and `/api/login`; a live credential arrives in the query string on `/verify-email?token=`; `connect.sid` rides in the cookie header.
 - **Serializers fail closed.** Build a fresh object containing only named fields; never delete keys from a default object.
 - **Exactly seven request-derived fields** on a request line: `method`, `path`, `status`, `durationMs`, `userId`, `ip`, `ua` — plus `reqId`, `level`, `time`, `env`, `pid`, `msg`.
-- **No behaviour changes.** Status codes, response bodies, redirects and control flow stay byte-for-byte identical. This work only changes what gets logged.
+- **No behaviour changes**, with exactly one sanctioned exception. Status codes, response bodies, redirects and control flow stay byte-for-byte identical; this work only changes what gets logged. **The single exception, approved before execution:** Task 4 Step 2 adds the missing `done(err)` call in `deserializeUser`. Today that path swallows the error and never calls `done`, so the request hangs until the browser gives up; after the change it fails as a 500. This is intended, not scope creep. No other behaviour change is permitted — if a task appears to require one, stop and report it.
 - **Errors are logged as `{ err }`** so pino's `stdSerializers.err` handles them. `JSON.stringify(new Error('x'))` is `{}` and loses the stack silently.
 - **Commit author must be `smacica <s.macica7@gmail.com>`.** Never Claude as author or co-author. Short lowercase commit subjects. Use:
   `git -c user.name="smacica" -c user.email="s.macica7@gmail.com" commit --author="smacica <s.macica7@gmail.com>" -m "<subject>"`
