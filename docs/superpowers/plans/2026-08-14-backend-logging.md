@@ -629,8 +629,25 @@ git -c user.name="smacica" -c user.email="s.macica7@gmail.com" \
 - Modify: `index.js` (6 console calls, lines 30, 57, 67, 72, 78, 80)
 
 **Interfaces:**
-- Consumes: `{ logger }` from Task 1, `{ requestLog, attachReqId }` from Task 2.
+- Consumes: `{ logger }` from Task 1, `{ requestLog }` from Task 2.
 - Produces: `req.log` on every request, available to Tasks 5 and 6.
+
+- [ ] **Step 0: Delete the dead `attachReqId` middleware**
+
+Task 2 originally used `attachReqId` to rebind `req.log` with the request id. Its
+fix round set `quietReqLogger`/`quietResLogger`, which makes pino-http bind
+`reqId` onto `req.log` itself, so the rebind was removed and the function is now
+a no-op whose two branches both just call `next()`. Its name promises a rebind it
+no longer performs, so it goes rather than being mounted.
+
+In `request_log.js`: delete the `attachReqId` function and remove it from both
+the `buildRequestLog` return object and `module.exports`. `buildRequestLog` now
+returns `{ requestLog }`, and the module exports
+`{ requestLog, buildRequestLog, pathOf, isStatic }`.
+
+In `test/request_log.test.js`: `makeApp` destructures and mounts `attachReqId` —
+remove both. Do not change any assertion. All 16 tests must still pass, which is
+the check that `reqId` correlation survives without it.
 
 - [ ] **Step 1: Add the requires**
 
@@ -638,7 +655,7 @@ After the existing `const path = require('path')` on line 12:
 
 ```js
 const { logger } = require('./logger')
-const { requestLog, attachReqId } = require('./request_log')
+const { requestLog } = require('./request_log')
 ```
 
 - [ ] **Step 2: Fix the deserializeUser handler**
@@ -670,7 +687,6 @@ app.use(cors({ origin: clientUrl || true, credentials: true }))
 app.options('*', cors({ origin: clientUrl || true, credentials: true }));
 //before session and passport on purpose - a failure in either still gets logged
 app.use(requestLog);
-app.use(attachReqId);
 app.use(session(sessionConf));
 ```
 
