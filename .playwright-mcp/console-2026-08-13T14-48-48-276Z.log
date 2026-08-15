@@ -1,0 +1,26 @@
+[23549272ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:963
+[63601385ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:5173/src/App.vue?t=1786696129633:0
+[63601385ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://localhost:5173/src/App.vue?t=1786696129633&vue&type=style&index=0&scoped=7a7a37b1&lang.css:0
+[63601385ms] [ERROR] [vite] Failed to reload /src/App.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601387ms] [ERROR] [vite] Failed to reload /src/App.vue?vue&type=style&index=0&scoped=7a7a37b1&lang.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601392ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/assets/theme.css?t=1786696129633:0
+[63601392ms] [ERROR] [vite] Failed to reload /src/assets/theme.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601394ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/components/AppFooter.vue?t=1786696129633:0
+[63601394ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/components/AppFooter.vue?t=1786696129633&vue&type=style&index=0&scoped=6704560a&lang.css:0
+[63601394ms] [ERROR] [vite] Failed to reload /src/components/AppFooter.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601394ms] [ERROR] [vite] Failed to reload /src/components/AppFooter.vue?vue&type=style&index=0&scoped=6704560a&lang.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601397ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/components/AppNav.vue?t=1786696129633:0
+[63601397ms] [ERROR] [vite] Failed to reload /src/components/AppNav.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601397ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/components/AppNav.vue?t=1786696129633&vue&type=style&index=0&scoped=d80c7d29&lang.css:0
+[63601397ms] [ERROR] [vite] Failed to reload /src/components/AppNav.vue?vue&type=style&index=0&scoped=d80c7d29&lang.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601400ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/components/CookingLoader.vue?t=1786696129633:0
+[63601400ms] [ERROR] [vite] Failed to reload /src/components/CookingLoader.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601400ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/components/CookingLoader.vue?t=1786696129633&vue&type=style&index=0&scoped=f15a4c98&lang.css:0
+[63601400ms] [ERROR] [vite] Failed to reload /src/components/CookingLoader.vue?vue&type=style&index=0&scoped=f15a4c98&lang.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601403ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/views/GenerateRecipeView.vue?t=1786696129633:0
+[63601403ms] [ERROR] [vite] Failed to reload /src/views/GenerateRecipeView.vue. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601403ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/src/views/GenerateRecipeView.vue?t=1786696129633&vue&type=style&index=0&scoped=dcc1c704&lang.css:0
+[63601404ms] [ERROR] [vite] Failed to reload /src/views/GenerateRecipeView.vue?vue&type=style&index=0&scoped=dcc1c704&lang.css. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[63601404ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:5173/@vite/client:963
+[63601411ms] [ERROR] WebSocket connection to 'ws://localhost:5173/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:5173/@vite/client:1034
+[63601587ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ chrome-error://chromewebdata/:0
