@@ -2,6 +2,7 @@ const uuid = require('uuid').v4
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs')
 const path = require('path')
+const { logger } = require('./logger')
 
 //the data folder is gitignored, so create it before sqlite tries to open the db file
 const dataDir = path.join(__dirname, 'data')
@@ -101,7 +102,7 @@ function migrateUsers(){
                 if(err){
                     reject(new Error(err))
                 }else{
-                    console.log('users table migrated')
+                    logger.info('users table migrated')
                     resolve()
                 }
             })
@@ -113,25 +114,25 @@ let db = new sqlite3.Database(dbPath, (err) => {
 
     if(err)
     {
-    console.log("Error Occurred - " + err.message);
+    logger.error({ err }, 'could not open the database')
     }else{
-        console.log('sqlite connected')
+        logger.info('sqlite connected')
         db.get("PRAGMA foreign_keys = ON",(err,data)=>{
             if(err){
-                console.log(err)
+                logger.error({ err }, 'could not turn foreign keys on')
             }
         })
         db.exec(schemaQuerry,(err)=>{
             if(err){
-                return console.log(err)
+                return logger.error({ err }, 'could not apply the schema')
             }
             migrateUsers().then(()=>{
                 db.exec(indexQuerry + verifyGoogleUsersQuerry,(err)=>{
                     if(err){
-                        console.log(err)
+                        logger.error({ err }, 'could not apply the indexes')
                     }
                 })
-            }).catch(err=>console.log(err))
+            }).catch(err=>logger.error({ err }, 'could not migrate the users table'))
         })
     }
 })
@@ -208,7 +209,7 @@ async function getRecipes(data){
         //a ranking row can outlive its recipe when something deleted the recipe on a
         //connection without foreign keys on. skip it instead of dying on the whole list.
         if(!recipe){
-            console.log(`ranking row ${rank.recipe_id} has no recipe, skipping`)
+            logger.warn({ recipeId: rank.recipe_id }, 'ranking row has no recipe, skipping')
             continue
         }
 

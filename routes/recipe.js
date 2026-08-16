@@ -10,17 +10,19 @@ const date = require('../aditional_functions/get_current_date')
 const { normaliseIngredients } = require('../shared/ingredients.mjs')
 const { generateRecipe, isConfigured: geminiConfigured } = require('../gemini')
 const aiQuota = require('../ai_quota')
+const { logger } = require('../logger')
+const { audit } = require('../audit')
 
 const picsDir = path.join(__dirname, '..', 'data', 'recipes_pics')
 
 //artwork that generated recipes get as their photo. vite copies this folder into
 //the build, so the same /ai_pics/... url works in dev and in production.
-const aiPicsDir = path.join(__dirname, '..', 'frontend', 'public', 'ai_pics')
+const aiPicsDir = path.join(__dirname, '..', '..', 'frontend', 'public', 'ai_pics')
 let aiPics = []
 try{
   aiPics = fs.readdirSync(aiPicsDir).filter(name => /\.(jpe?g|png|webp)$/i.test(name))
 }catch(err){
-  console.log('no ai_pics folder found, generated recipes will have no photo')
+  logger.warn('no ai_pics folder found, generated recipes will have no photo')
 }
 
 function randomAiPic(){
@@ -72,9 +74,10 @@ router.post('/api/recipes',isLoggedIn,generateRecipeId, upload.single('image'), 
   }
 
   insertRecipe(recipe).then(()=>{
+    audit.recipeCreated(req.log, { userId: req.user.user_id, recipeId: recipe.recipe_id, source: 'manual' })
     res.status(201).json({recipe_id: recipe.recipe_id})
   }).catch(err=>{
-    console.log(err)
+    req.log.error({ err }, 'could not save the recipe')
     res.status(500).json({message: "could not save the recipe"})
   })
 })
@@ -90,20 +93,24 @@ router.delete('/api/recipes/:id',isLoggedIn,(req,res)=>{
     if(!result.deleted){
       const status = result.reason === 'forbidden' ? 403 : 404
       const message = result.reason === 'forbidden' ? "that is not your recipe" : "recipe not found"
+      if(result.reason === 'forbidden'){
+        audit.deleteDenied(req.log, { userId: req.user.user_id, recipeId: id, kind: 'recipe' })
+      }
       return res.status(status).json({message})
     }
+    audit.recipeDeleted(req.log, { userId: req.user.user_id, recipeId: id })
 
     //the row is gone either way, a leftover file is not worth failing the request over
     if(result.photo){
       fs.unlink(path.join(picsDir, path.basename(result.photo)),(err)=>{
         if(err && err.code !== 'ENOENT'){
-          console.log(err)
+          req.log.warn({ err }, 'could not delete the recipe photo')
         }
       })
     }
     res.json({message: "recipe deleted"})
   }).catch(err=>{
-    console.log(err)
+    req.log.error({ err }, 'could not delete the recipe')
     res.status(500).json({message: "could not delete the recipe"})
   })
 })
@@ -118,7 +125,7 @@ router.get('/api/ai/quota', isLoggedIn, (req, res)=>{
   aiQuota.peek(req.user.user_id).then(quota=>{
     res.json({ ...quota, configured: geminiConfigured() })
   }).catch(err=>{
-    console.log(err)
+    req.log.error({ err }, 'could not read the ai quota')
     res.status(500).json({message: "could not read the quota"})
   })
 })
@@ -150,6 +157,7 @@ router.post('/api/recipes/generate', isLoggedIn, generateRecipeId, async (req, r
     //booked before the call so a burst of requests cannot slip past the free tier
     const slot = await aiQuota.reserve(req.user.user_id)
     if(!slot.ok){
+      audit.aiQuotaDenied(req.log, { userId: req.user.user_id, reason: slot.reason })
       return res.status(429).json({message: slot.message, reason: slot.reason})
     }
 
@@ -157,6 +165,7 @@ router.post('/api/recipes/generate', isLoggedIn, generateRecipeId, async (req, r
 
     if(!result.ok){
       const [status, message] = FAILURES[result.reason] || FAILURES.upstream
+      audit.aiRejected(req.log, { userId: req.user.user_id, reason: result.reason })
       return res.status(status).json({message, reason: result.reason})
     }
 
@@ -172,9 +181,11 @@ router.post('/api/recipes/generate', isLoggedIn, generateRecipeId, async (req, r
     }
 
     await insertRecipe(recipe)
+    audit.recipeCreated(req.log, { userId: req.user.user_id, recipeId: recipe.recipe_id, source: 'ai' })
+    audit.aiGenerated(req.log, { userId: req.user.user_id, remaining: slot.remaining })
     res.status(201).json({ recipe_id: recipe.recipe_id, remaining: slot.remaining })
   }catch(err){
-    console.log(err)
+    req.log.error({ err }, 'could not save the generated recipe')
     res.status(500).json({message: "Could not save the generated recipe."})
   }
 })
@@ -189,7 +200,7 @@ router.get('/api/recipes/:id/comments',(req,res)=>{
   dbComments(id).then(comments=>{
     res.json(comments)
   }).catch(err=>{
-    console.log(err)
+    req.log.error({ err }, 'could not load the comments')
     res.status(500).json({message: "could not load the comments"})
   })
 })
@@ -215,11 +226,11 @@ router.post('/api/recipes/:id/comments',isLoggedIn,(req,res)=>{
     dbAddComment(id, req.user.user_id, body).then(comment=>{
       res.status(201).json(comment)
     }).catch(err=>{
-      console.log(err)
+      req.log.error({ err }, 'could not save the comment')
       res.status(500).json({message: "could not save the comment"})
     })
   }).catch(err=>{
-    console.log(err)
+    req.log.error({ err }, 'could not save the comment')
     res.status(500).json({message: "could not save the comment"})
   })
 })
@@ -234,11 +245,14 @@ router.delete('/api/comments/:comment_id',isLoggedIn,(req,res)=>{
     if(!result.deleted){
       const status = result.reason === 'forbidden' ? 403 : 404
       const message = result.reason === 'forbidden' ? "that is not your comment" : "comment not found"
+      if(result.reason === 'forbidden'){
+        audit.deleteDenied(req.log, { userId: req.user.user_id, recipeId: id, kind: 'comment' })
+      }
       return res.status(status).json({message})
     }
     res.json({message: "comment deleted"})
   }).catch(err=>{
-    console.log(err)
+    req.log.error({ err }, 'could not delete the comment')
     res.status(500).json({message: "could not delete the comment"})
   })
 })
@@ -257,7 +271,7 @@ router.post('/api/recipes/:recipe_id/like',isLoggedIn,(req,res)=>{
     }
   }).catch(err=>{
     //without this a rejection left the request open until the browser gave up
-    console.log(err)
+    req.log.error({ err }, 'could not record the vote')
     res.status(500).json({message: "could not record the vote"})
   })
 })
@@ -274,7 +288,7 @@ router.get('/api/recipes', (req, res) => {
     getMostLiked().then(data=>{
       res.json(data)
     }).catch(err=>{
-      console.log(err)
+      req.log.error({ err }, 'could not load the recipes')
       res.status(500).json({message: "could not load the recipes"})
     })
   });
@@ -284,7 +298,7 @@ router.get('/api/recipes/mine',isLoggedIn,(req,res)=>{
     dbMyRecipes(req.user.user_id).then((data)=>{
       res.json(data)
     }).catch(err=>{
-      console.log(err)
+      req.log.error({ err }, 'could not load your recipes')
       res.status(500).json({message: "could not load your recipes"})
     })
 })
@@ -300,7 +314,7 @@ router.get('/api/recipes/:id',(req,res)=>{
         }
         res.json(recipe)
     }).catch(err=>{
-      console.log(err)
+      req.log.error({ err }, 'could not load the recipe')
       res.status(500).json({message: "could not load the recipe"})
     })
 })

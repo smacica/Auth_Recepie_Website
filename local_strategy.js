@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { dbFindByEmail, dbCreateEmailToken } = require('./db')
 const { sendVerificationEmail } = require('./mailer')
+const { logger } = require('./logger')
 
 const TOKEN_LIFETIME = 24 * 60 * 60 * 1000 // a day
 
@@ -32,7 +33,7 @@ const strategy = new LocalStrategy(
 
       return done(null, user)
     } catch (err) {
-      console.log(err)
+      logger.error({ err }, 'local sign in failed')
       return done(err)
     }
   }

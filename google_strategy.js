@@ -1,12 +1,13 @@
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const { dbFind, dbFindOrCreateGoogleUser } = require('./db')
+const { logger } = require('./logger')
 
 //where google sends the browser back to - must match the redirect uri
 //registered in the google cloud console, character for character
 const callbackURL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:4000/auth/google/callback'
 
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-  console.warn('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are missing, sign in will fail. See README.md')
+  logger.warn('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are missing, sign in will fail. See README.md')
 }
 
 const strategy = new GoogleStrategy(
@@ -26,7 +27,7 @@ const strategy = new GoogleStrategy(
       })
       return done(null, user)
     } catch (err) {
-      console.log(err)
+      logger.error({ err }, 'could not find or create the google user')
       return done(err)
     }
   }

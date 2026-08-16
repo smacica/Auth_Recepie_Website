@@ -1,0 +1,23 @@
+ALSO LOOK FOR (Express/Node specifics):
+- Route-mount ordering: a router mounted before requireAuth, or a
+  route registered above the auth middleware in app.js
+- IDOR: :id / :orderId params used in a query without an ownership
+  or tenant predicate
+- Mass assignment: req.body spread straight into an ORM create/update
+- NoSQL operator injection: req.query/req.body values reaching Mongo
+  filters without $-operator stripping
+- SSRF: user-supplied URLs passed to fetch/axios/got, incl. redirect
+  following and internal metadata endpoints
+- Path traversal: res.sendFile / express.static / fs calls built from
+  req.params or req.query
+- child_process exec/execSync with any request-derived string
+- Template injection in ejs/pug/handlebars rendered with user data
+- JWT: verify() without an explicit algorithms allowlist, default or
+  env-fallback secrets, missing exp/aud checks
+- CORS: origin reflection combined with credentials: true
+- Prototype pollution via lodash.merge/defaultsDeep, qs, or
+  Object.assign over request-derived objects
+- Upload handling: multer destination/filename derived from the
+  client-supplied name; content-type trusted for storage decisions
+- Error middleware leaking stack traces or SQL to the response body
+- Open redirect (report it even though the default brief excludes it)

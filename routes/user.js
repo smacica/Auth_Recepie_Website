@@ -4,6 +4,7 @@ const router = express.Router()
 const { isLoggedIn, addLikesToUser } = require('../google_strategy')
 const { hashPassword, issueVerificationEmail } = require('../local_strategy')
 const { dbCreateLocalUser, dbFindByEmail, dbConsumeEmailToken } = require('../db')
+const { audit } = require('../audit')
 
 //in dev the vue app runs on :5173, in prod it is served from this same origin
 const clientUrl = process.env.CLIENT_URL || ''
@@ -50,6 +51,7 @@ router.post('/api/signup', async function(req, res){
         //route cannot be used to find out who has an account. the owner just gets no mail.
         if(user){
             const { delivered } = await issueVerificationEmail(user, baseUrl(req))
+            audit.signUp(req.log, { userId: user.user_id })
             return res.status(201).json({
                 message: "Check your inbox for the confirmation link.",
                 //lets the dev setup say "look in the server console" instead
@@ -58,7 +60,7 @@ router.post('/api/signup', async function(req, res){
         }
         return res.status(201).json({message: "Check your inbox for the confirmation link.", delivered: true})
     }catch(err){
-        console.log(err)
+        req.log.error({ err }, 'could not create the account')
         res.status(500).json({message: "Could not create the account."})
     }
 })
@@ -71,16 +73,21 @@ router.post('/api/login', function(req, res, next){
         if(!user){
             //401 for a bad password, 403 when the account exists but is not confirmed
             const status = info?.code === 'unverified' ? 403 : 401
+            audit.signInFailed(req.log, {
+                ip: req.ip,
+                reason: info?.code === 'unverified' ? 'unverified' : 'bad_password'
+            })
             return res.status(status).json({message: info?.message || "Wrong email or password.", code: info?.code})
         }
         req.login(user, function(err){
             if(err){
                 return next(err)
             }
+            audit.signIn(req.log, { userId: user.user_id, method: 'local' })
             addLikesToUser(user).then(user_object=>{
                 res.json(user_object)
             }).catch(err=>{
-                console.log(err)
+                req.log.error({ err }, 'signed in but could not load the profile')
                 res.status(500).json({message: "Signed in, but could not load the profile."})
             })
         })
@@ -98,9 +105,10 @@ router.get('/verify-email', async function(req, res){
         if(result.expired){
             return res.redirect(`${clientUrl}/signin?verify=expired`)
         }
+        audit.emailVerified(req.log, { userId: result.user_id })
         res.redirect(`${clientUrl}/signin?verify=ok`)
     }catch(err){
-        console.log(err)
+        req.log.error({ err }, 'could not consume the verification token')
         res.redirect(`${clientUrl}/signin?verify=invalid`)
     }
 })
@@ -116,7 +124,7 @@ router.post('/api/resend-verification', async function(req, res){
         }
         res.json({message: "If that address needs confirming, a new link is on its way."})
     }catch(err){
-        console.log(err)
+        req.log.error({ err }, 'could not resend the verification link')
         res.status(500).json({message: "Could not send the link."})
     }
 })
@@ -137,16 +145,18 @@ router.get('/auth/google', function(req, res, next){
 router.get('/auth/google/callback', function(req, res, next){
     passport.authenticate('google', function(err, user){
         if(err || !user){
-            console.log('google sign in failed:', err ? err.message : 'no user returned')
+            req.log.warn({ err }, 'google sign in failed')
+            audit.signInFailed(req.log, { ip: req.ip, reason: 'google' })
             return res.redirect(`${clientUrl}/signin?error=auth`)
         }
         req.login(user, function(err){
             if(err){
-                console.log('google sign in failed at login:', err.message)
+                req.log.warn({ err }, 'google sign in failed at login')
                 return res.redirect(`${clientUrl}/signin?error=auth`)
             }
             const returnTo = safeNext(req.session.returnTo)
             delete req.session.returnTo
+            audit.signIn(req.log, { userId: user.user_id, method: 'google' })
             res.redirect(clientUrl + returnTo)
         })
     })(req, res, next)
@@ -155,17 +165,21 @@ router.get('/auth/google/callback', function(req, res, next){
 /* ---------- session ---------- */
 
 router.post('/api/logout', function(req, res, next){
+    //req.user is gone once logout runs, so read it first
+    const userId = req.user ? req.user.user_id : null
+
     req.logout(function(err) {
         if (err) {
-            console.log(err)
+            req.log.error({ err }, 'logout failed')
             return next(err);
         }
         //drop the session row too, otherwise the old cookie still resolves
         req.session.destroy(function(err) {
             if (err) {
-                console.log(err)
+                req.log.error({ err }, 'could not destroy the session')
             }
             res.clearCookie('connect.sid')
+            audit.logout(req.log, { userId })
             res.json({message: "you have been logged out"})
         })
     });
@@ -175,7 +189,7 @@ router.get('/api/profile', isLoggedIn, function(req,res){
     addLikesToUser(req.user).then(user_object=>{
         res.json(user_object)
     }).catch(err=>{
-        console.log(err)
+        req.log.error({ err }, 'could not load the profile')
         res.status(500).json({message: "could not load the profile"})
     })
 })

@@ -4,10 +4,14 @@ Recipe sharing site. Express + SQLite API, Vue 3 frontend. Sign in with Google o
 with an email address confirmed by a verification link.
 
 ```
-.                     express api (routes/, db.js, gemini.js, ai_quota.js)
-├── shared/           code both sides import (ingredient emoji rules)
-└── frontend/         vue 3 + vite app, builds into frontend/dist
+claude_scan/
+├── Auth_Recepie_Website/   express api (routes/, db.js, gemini.js, ai_quota.js)
+│   └── shared/             code both sides import (ingredient emoji rules)
+└── frontend/               vue 3 + vite app, builds into frontend/dist
 ```
+
+The frontend is a sibling folder, not a subfolder. The Express side expects to find
+it at `../frontend` relative to this project root.
 
 `shared/ingredients.mjs` is written as ESM and used by both: Vite imports it through
 the `@shared` alias, and the Express side reaches it with `require()`, which Node
@@ -77,9 +81,9 @@ a recipe missing a title, ingredients or steps is rejected as `incomplete` rathe
 than saved half-built. Lists are capped at 20 ingredients and 15 steps, and any
 ingredient the model forgot an emoji for gets one guessed from its name.
 
-Generated recipes get a random illustration from `frontend/public/ai_pics`. Those
-are committed to the repo already compressed to 1024×768 (4:3), matching the ratio
-the cards and detail page use.
+Generated recipes get a random illustration from `../frontend/public/ai_pics`. Those
+are stored already compressed to 1024×768 (4:3), matching the ratio the cards and
+detail page use.
 
 ---
 
@@ -235,7 +239,7 @@ npm run dev                       # api on http://localhost:4000
 ```
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev                       # ui on http://localhost:5173
 ```
@@ -247,11 +251,56 @@ Vite server after signing in. Vite proxies the API routes through to port 4000.
 
 ```bash
 npm install
-npm run build                     # builds frontend/dist
+npm run build                     # builds ../frontend/dist
 npm start                         # serves the api and the built ui on :4000
 ```
 
 ---
+
+## Logging
+
+The backend writes newline-delimited JSON to stdout. Nothing is written to disk,
+because the App Platform filesystem is ephemeral — DigitalOcean captures stdout
+into the runtime log console.
+
+In development the `dev` script pipes through `pino-pretty` for readable output:
+
+```bash
+npm run dev
+```
+
+`npm start` leaves the output as raw JSON, which is what you want in production.
+
+Each completed request logs one line:
+
+```json
+{"level":30,"time":1755100000000,"env":"production","pid":30213,"reqId":"…","method":"GET",
+ "path":"/api/recipes/42","status":200,"durationMs":14,"userId":7,
+ "ip":"203.0.113.9","ua":"Mozilla/5.0 …","msg":"request"}
+```
+
+2xx and 3xx log at `info`, 4xx at `warn`, 5xx at `error`, so `level>=40` finds
+everything that went wrong. Requests for the built frontend bundle and the AI
+artwork are not logged.
+
+**Bodies and query strings are never logged, and of all the request headers only
+`User-Agent` is.** The serializer names the handful of fields it keeps rather
+than the ones it drops, so no body, no query-string value, and no header beyond
+that one allowlisted `User-Agent` can reach a log line — which is what keeps
+passwords, the `/verify-email` token and the `connect.sid` cookie out.
+
+Errors logged inside a route share their `reqId` with the request line, so
+grepping one id gives the request and everything that happened during it. Those
+in-route lines carry only `reqId`, with no `userId` field at all; the request
+line is the one that carries the user id.
+
+Security-relevant actions log an `event` field: `sign_in`, `sign_in_failed`,
+`sign_up`, `email_verified`, `logout`, `recipe_created`, `recipe_deleted`,
+`delete_denied`, `ai_generated`, `ai_quota_denied`, `ai_rejected`. The AI three
+are worth watching — they show when the Gemini free-tier guard is being hit.
+
+Set `LOG_LEVEL` to change verbosity. It defaults to `info` in production and
+`debug` elsewhere.
 
 ## Auth notes
 

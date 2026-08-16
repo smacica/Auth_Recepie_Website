@@ -1,0 +1,46 @@
+- The only database is sqlite3 through the helpers in db.js. Every value is
+  bound with a ? placeholder. dbFind/dbUpdate/dbDel do interpolate their
+  table/column arguments, and dbFind interpolates its `limit` argument into
+  LIMIT, but every call site passes string literals. Report SQLi only where a
+  request-derived value reaches the table, column, or limit argument of one of
+  those helpers, or a new db.run/db.all/db.exec built by concatenation.
+
+- There is no Prisma, Mongo, Mongoose, or Sequelize. The `mysql` and
+  `express-mysql-session` entries in package.json are unused leftovers - nothing
+  requires them. Do not report NoSQL operator injection or findings against a
+  mysql code path.
+
+- Authentication is per-route, not global: `isLoggedIn` (google_strategy.js:38)
+  is passed as middleware on each protected route. There is no app-wide auth
+  mount, so route-mount ordering relative to an auth middleware is not a finding
+  here. These routes are public by design - do not report missing auth on them:
+  GET /api/recipes, GET /api/recipes/:id, GET /api/recipes/:id/comments,
+  GET /data/recipes_pics/:filename, and the signup / login / logout /
+  resend-verification / verify-email / google oauth routes in routes/user.js.
+  Missing auth is reportable on any other route that reads req.user or writes.
+
+- Ownership checks live in db.js, not in the route handler. dbDeleteRecipe
+  compares recipe.user_id to the caller and dbDeleteComment allows the comment
+  author or the recipe owner. Do not report IDOR for DELETE /api/recipes/:id or
+  DELETE /api/comments/:comment_id on the grounds that the route has no
+  ownership predicate. IDOR is still reportable where an :id reaches a query
+  with no ownership predicate anywhere in the chain.
+
+- Redirects are already constrained: safeNext() in routes/user.js rejects
+  anything not starting with a single '/', and clientUrl comes from the
+  CLIENT_URL environment variable, not from the request. Do not report open
+  redirect for /auth/google, /auth/google/callback, or /verify-email. An
+  unguarded redirect sink elsewhere is still reportable.
+
+- GET /data/recipes_pics/:filename wraps the parameter in path.basename() before
+  res.sendFile, so it is not a path traversal. How that upload was named and
+  typed on the way in is a separate question and is still reportable.
+
+STILL REPORTABLE - do not assume these are handled elsewhere:
+- There is no rate limiting, helmet, CSRF middleware, or WAF anywhere in this
+  project, and no edge proxy of our own in front of it. Abuse of the unauth
+  signup and resend-verification mail paths, and ReDoS, are in scope.
+- CORS at index.js:43 falls back to `origin: true` with credentials: true when
+  CLIENT_URL is unset. That is a real finding, not a false positive.
+- SESSION_SECRET falls back to a hardcoded development value
+  (session_config.js:25). Also real.
